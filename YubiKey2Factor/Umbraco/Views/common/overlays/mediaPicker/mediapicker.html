@@ -28,8 +28,7 @@
          <div class="upload-button">
              <umb-button
                 type="button"
-                key="general_upload"
-                label="Upload"
+                label-key="general_upload"
                 action="upload()"
                 disabled="disabled">
              </umb-button>
@@ -37,7 +36,7 @@
 
       </div>
 
-      <div class="row umb-control-group" ng-if="!searchOptions.filter">
+      <div class="row umb-control-group" ng-show="!searchOptions.filter">
          <ul class="umb-breadcrumbs">
             <li ng-hide="startNodeId != -1" class="umb-breadcrumbs__ancestor">
                <a href ng-click="gotoFolder()" prevent-default>Media</a>
@@ -56,7 +55,7 @@
 
                <input
                   type="text"
-                  class="input-foldername input-mini inline"
+                  class="umb-breadcrumbs__add-ancestor"
                   ng-show="showFolderInput"
                   ng-model="newFolderName"
                   ng-keydown="enterSubmitFolder($event)"
@@ -64,7 +63,7 @@
                   focus-when="{{showFolderInput}}" />
                </li>
           </ul>
-
+          <div class="umb-loader" ng-if="creatingFolder"></div>
       </div>
 
       <umb-file-dropzone
