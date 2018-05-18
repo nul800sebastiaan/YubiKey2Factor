@@ -2,6 +2,7 @@
 using Microsoft.AspNet.Identity;
 using Microsoft.AspNet.Identity.Owin;
 using Microsoft.Owin;
+using Umbraco.Core.Configuration;
 using Umbraco.Core.Models.Identity;
 using Umbraco.Core.Security;
 using Umbraco.Core.Services;
@@ -23,21 +24,24 @@ namespace TwoFactorAuthentication.Middleware
         /// </summary>
         /// <param name="options"></param>
         /// <param name="userService"></param>
+        /// <param name="entityService"></param>
         /// <param name="externalLoginService"></param>
         /// <param name="membershipProvider"></param>
         /// <returns></returns>
         public static TwoFactorBackOfficeUserManager Create(
             IdentityFactoryOptions<TwoFactorBackOfficeUserManager> options,
             IUserService userService,
+            IEntityService entityService,
             IExternalLoginService externalLoginService,
             MembershipProviderBase membershipProvider)
         {
             if (options == null) throw new ArgumentNullException("options");
             if (userService == null) throw new ArgumentNullException("userService");
+            if (entityService == null) throw new ArgumentNullException("entityService");
             if (externalLoginService == null) throw new ArgumentNullException("externalLoginService");
 
-            var manager = new TwoFactorBackOfficeUserManager(new TwoFactorBackOfficeUserStore(userService, externalLoginService, membershipProvider));
-            manager.InitUserManager(manager, membershipProvider, options.DataProtectionProvider);
+            var manager = new TwoFactorBackOfficeUserManager(new TwoFactorBackOfficeUserStore(userService, externalLoginService, entityService, membershipProvider));
+            manager.InitUserManager(manager, membershipProvider, options.DataProtectionProvider, UmbracoConfig.For.UmbracoSettings().Content);
             
             //Here you can specify the 2FA providers that you want to implement
             var dataProtectionProvider = options.DataProtectionProvider;
@@ -49,6 +53,7 @@ namespace TwoFactorAuthentication.Middleware
             return manager;
         }
 
+        /// <inheritdoc />
         /// <summary>
         /// Override to return true
         /// </summary>

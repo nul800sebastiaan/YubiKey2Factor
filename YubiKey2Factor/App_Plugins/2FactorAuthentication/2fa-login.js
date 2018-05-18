@@ -10,10 +10,6 @@
             .then(function (data) {
                 console.log(data);
                 $scope.providers = data;
-                ////if (data.length === 1) {
-                //    $scope.provider = data[0];
-                //    $scope.step = "code";
-                ////}
             });
 
         $scope.send = function (provider) {

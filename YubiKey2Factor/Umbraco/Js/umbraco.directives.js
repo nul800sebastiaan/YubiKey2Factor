@@ -693,6 +693,116 @@
             }
         };
     });
+    (function () {
+        'use strict';
+        function BackdropDirective($timeout, $http) {
+            function link(scope, el, attr, ctrl) {
+                var events = [];
+                scope.clickBackdrop = function (event) {
+                    if (scope.disableEventsOnClick === true) {
+                        event.preventDefault();
+                        event.stopPropagation();
+                    }
+                };
+                function onInit() {
+                    if (scope.highlightElement) {
+                        setHighlight();
+                    }
+                }
+                function setHighlight() {
+                    scope.loading = true;
+                    $timeout(function () {
+                        // The element to highlight
+                        var highlightElement = angular.element(scope.highlightElement);
+                        if (highlightElement && highlightElement.length > 0) {
+                            var offset = highlightElement.offset();
+                            var width = highlightElement.outerWidth();
+                            var height = highlightElement.outerHeight();
+                            // Rounding numbers
+                            var topDistance = offset.top.toFixed();
+                            var topAndHeight = (offset.top + height).toFixed();
+                            var leftDistance = offset.left.toFixed();
+                            var leftAndWidth = (offset.left + width).toFixed();
+                            // The four rectangles
+                            var rectTop = el.find('.umb-backdrop__rect--top');
+                            var rectRight = el.find('.umb-backdrop__rect--right');
+                            var rectBottom = el.find('.umb-backdrop__rect--bottom');
+                            var rectLeft = el.find('.umb-backdrop__rect--left');
+                            // Add the css
+                            scope.rectTopCss = {
+                                'height': topDistance,
+                                'left': leftDistance + 'px',
+                                opacity: scope.backdropOpacity
+                            };
+                            scope.rectRightCss = {
+                                'left': leftAndWidth + 'px',
+                                'top': topDistance + 'px',
+                                'height': height,
+                                opacity: scope.backdropOpacity
+                            };
+                            scope.rectBottomCss = {
+                                'height': '100%',
+                                'top': topAndHeight + 'px',
+                                'left': leftDistance + 'px',
+                                opacity: scope.backdropOpacity
+                            };
+                            scope.rectLeftCss = {
+                                'width': leftDistance,
+                                opacity: scope.backdropOpacity
+                            };
+                            // Prevent interaction in the highlighted area
+                            if (scope.highlightPreventClick) {
+                                var preventClickElement = el.find('.umb-backdrop__highlight-prevent-click');
+                                preventClickElement.css({
+                                    'width': width,
+                                    'height': height,
+                                    'left': offset.left,
+                                    'top': offset.top
+                                });
+                            }
+                        }
+                        scope.loading = false;
+                    });
+                }
+                function resize() {
+                    setHighlight();
+                }
+                events.push(scope.$watch('highlightElement', function (newValue, oldValue) {
+                    if (!newValue) {
+                        return;
+                    }
+                    if (newValue === oldValue) {
+                        return;
+                    }
+                    setHighlight();
+                }));
+                $(window).on('resize.umbBackdrop', resize);
+                scope.$on('$destroy', function () {
+                    // unbind watchers
+                    for (var e in events) {
+                        events[e]();
+                    }
+                    $(window).off('resize.umbBackdrop');
+                });
+                onInit();
+            }
+            var directive = {
+                transclude: true,
+                restrict: 'E',
+                replace: true,
+                templateUrl: 'views/components/application/umb-backdrop.html',
+                link: link,
+                scope: {
+                    backdropOpacity: '=?',
+                    highlightElement: '=?',
+                    highlightPreventClick: '=?',
+                    disableEventsOnClick: '=?'
+                }
+            };
+            return directive;
+        }
+        angular.module('umbraco.directives').directive('umbBackdrop', BackdropDirective);
+    }());
     angular.module('umbraco.directives').directive('umbContextMenu', function (navigationService) {
         return {
             scope: {
@@ -714,6 +824,317 @@
         };
     });
     /**
+@ngdoc directive
+@name umbraco.directives.directive:umbDrawer
+@restrict E
+@scope
+
+@description
+The drawer component is a global component and is already added to the umbraco markup. It is registered in globalState and can be opened and configured by raising events.
+
+<h3>Markup example - how to open the drawer</h3>
+<pre>
+    <div ng-controller="My.DrawerController as vm">
+
+        <umb-button
+            type="button"
+            label="Toggle drawer"
+            action="vm.toggleDrawer()">
+        </umb-button>
+
+    </div>
+</pre>
+
+<h3>Controller example - how to open the drawer</h3>
+<pre>
+    (function () {
+        "use strict";
+
+        function DrawerController(appState) {
+
+            var vm = this;
+
+            vm.toggleDrawer = toggleDrawer;
+
+            function toggleDrawer() {
+
+                var showDrawer = appState.getDrawerState("showDrawer");            
+
+                var model = {
+                    firstName: "Super",
+                    lastName: "Man"
+                };
+
+                appState.setDrawerState("view", "/App_Plugins/path/to/drawer.html");
+                appState.setDrawerState("model", model);
+                appState.setDrawerState("showDrawer", !showDrawer);
+                
+            }
+
+        }
+
+        angular.module("umbraco").controller("My.DrawerController", DrawerController);
+
+    })();
+</pre>
+
+<h3>Use the following components in the custom drawer to render the content</h3>
+<ul>
+    <li>{@link umbraco.directives.directive:umbDrawerView umbDrawerView}</li>
+    <li>{@link umbraco.directives.directive:umbDrawerHeader umbDrawerHeader}</li>
+    <li>{@link umbraco.directives.directive:umbDrawerView umbDrawerContent}</li>
+    <li>{@link umbraco.directives.directive:umbDrawerFooter umbDrawerFooter}</li>
+</ul>
+
+@param {string} view (<code>binding</code>): Set the drawer view
+@param {string} model (<code>binding</code>): Pass in custom data to the drawer
+
+**/
+    function Drawer($location, $routeParams, helpService, userService, localizationService, dashboardResource) {
+        return {
+            restrict: 'E',
+            // restrict to an element
+            replace: true,
+            // replace the html element with the template
+            templateUrl: 'views/components/application/umbdrawer/umb-drawer.html',
+            transclude: true,
+            scope: {
+                view: '=?',
+                model: '=?'
+            },
+            link: function (scope, element, attr, ctrl) {
+                function onInit() {
+                    setView();
+                }
+                function setView() {
+                    if (scope.view) {
+                        //we do this to avoid a hidden dialog to start loading unconfigured views before the first activation
+                        var configuredView = scope.view;
+                        if (scope.view.indexOf('.html') === -1) {
+                            var viewAlias = scope.view.toLowerCase();
+                            configuredView = 'views/common/drawers/' + viewAlias + '/' + viewAlias + '.html';
+                        }
+                        if (configuredView !== scope.configuredView) {
+                            scope.configuredView = configuredView;
+                        }
+                    }
+                }
+                onInit();
+            }
+        };
+    }
+    angular.module('umbraco.directives').directive('umbDrawer', Drawer);
+    /**
+@ngdoc directive
+@name umbraco.directives.directive:umbDrawerContent
+@restrict E
+@scope
+
+@description
+Use this directive to render drawer content
+
+<h3>Markup example</h3>
+<pre>
+	<umb-drawer-view>
+        
+        <umb-drawer-header
+            title="Drawer Title"
+            description="Drawer description">
+        </umb-drawer-header>
+
+        <umb-drawer-content>
+            <!-- Your content here -->
+            <pre>{{ model | json }}</pre>
+        </umb-drawer-content>
+
+        <umb-drawer-footer>
+            <!-- Your content here -->
+        </umb-drawer-footer>
+
+	</umb-drawer-view>
+</pre>
+
+
+<h3>Use in combination with</h3>
+<ul>
+    <li>{@link umbraco.directives.directive:umbDrawerView umbDrawerView}</li>
+    <li>{@link umbraco.directives.directive:umbDrawerHeader umbDrawerHeader}</li>
+    <li>{@link umbraco.directives.directive:umbDrawerFooter umbDrawerFooter}</li>
+</ul>
+
+**/
+    (function () {
+        'use strict';
+        function DrawerContentDirective() {
+            var directive = {
+                restrict: 'E',
+                replace: true,
+                transclude: true,
+                templateUrl: 'views/components/application/umbdrawer/umb-drawer-content.html'
+            };
+            return directive;
+        }
+        angular.module('umbraco.directives').directive('umbDrawerContent', DrawerContentDirective);
+    }());
+    /**
+@ngdoc directive
+@name umbraco.directives.directive:umbDrawerFooter
+@restrict E
+@scope
+
+@description
+Use this directive to render a drawer footer
+
+<h3>Markup example</h3>
+<pre>
+	<umb-drawer-view>
+        
+        <umb-drawer-header
+            title="Drawer Title"
+            description="Drawer description">
+        </umb-drawer-header>
+
+        <umb-drawer-content>
+            <!-- Your content here -->
+            <pre>{{ model | json }}</pre>
+        </umb-drawer-content>
+
+        <umb-drawer-footer>
+            <!-- Your content here -->
+        </umb-drawer-footer>
+
+	</umb-drawer-view>
+</pre>
+
+<h3>Use in combination with</h3>
+<ul>
+    <li>{@link umbraco.directives.directive:umbDrawerView umbDrawerView}</li>
+    <li>{@link umbraco.directives.directive:umbDrawerHeader umbDrawerHeader}</li>
+    <li>{@link umbraco.directives.directive:umbDrawerContent umbDrawerContent}</li>
+</ul>
+
+**/
+    (function () {
+        'use strict';
+        function DrawerFooterDirective() {
+            var directive = {
+                restrict: 'E',
+                replace: true,
+                transclude: true,
+                templateUrl: 'views/components/application/umbdrawer/umb-drawer-footer.html'
+            };
+            return directive;
+        }
+        angular.module('umbraco.directives').directive('umbDrawerFooter', DrawerFooterDirective);
+    }());
+    /**
+@ngdoc directive
+@name umbraco.directives.directive:umbDrawerHeader
+@restrict E
+@scope
+
+@description
+Use this directive to render a drawer header
+
+<h3>Markup example</h3>
+<pre>
+	<umb-drawer-view>
+        
+        <umb-drawer-header
+            title="Drawer Title"
+            description="Drawer description">
+        </umb-drawer-header>
+
+        <umb-drawer-content>
+            <!-- Your content here -->
+            <pre>{{ model | json }}</pre>
+        </umb-drawer-content>
+
+        <umb-drawer-footer>
+            <!-- Your content here -->
+        </umb-drawer-footer>
+
+	</umb-drawer-view>
+</pre>
+
+<h3>Use in combination with</h3>
+<ul>
+    <li>{@link umbraco.directives.directive:umbDrawerView umbDrawerView}</li>
+    <li>{@link umbraco.directives.directive:umbDrawerContent umbDrawerContent}</li>
+    <li>{@link umbraco.directives.directive:umbDrawerFooter umbDrawerFooter}</li>
+</ul>
+
+@param {string} title (<code>attribute</code>): Set a drawer title.
+@param {string} description (<code>attribute</code>): Set a drawer description.
+**/
+    (function () {
+        'use strict';
+        function DrawerHeaderDirective() {
+            var directive = {
+                restrict: 'E',
+                replace: true,
+                templateUrl: 'views/components/application/umbdrawer/umb-drawer-header.html',
+                scope: {
+                    'title': '@?',
+                    'description': '@?'
+                }
+            };
+            return directive;
+        }
+        angular.module('umbraco.directives').directive('umbDrawerHeader', DrawerHeaderDirective);
+    }());
+    /**
+@ngdoc directive
+@name umbraco.directives.directive:umbDrawerView
+@restrict E
+@scope
+
+@description
+Use this directive to render drawer view
+
+<h3>Markup example</h3>
+<pre>
+	<umb-drawer-view>
+        
+        <umb-drawer-header
+            title="Drawer Title"
+            description="Drawer description">
+        </umb-drawer-header>
+
+        <umb-drawer-content>
+            <!-- Your content here -->
+            <pre>{{ model | json }}</pre>
+        </umb-drawer-content>
+
+        <umb-drawer-footer>
+            <!-- Your content here -->
+        </umb-drawer-footer>
+
+	</umb-drawer-view>
+</pre>
+
+<h3>Use in combination with</h3>
+<ul>
+    <li>{@link umbraco.directives.directive:umbDrawerHeader umbDrawerHeader}</li>
+    <li>{@link umbraco.directives.directive:umbDrawerContent umbDrawerContent}</li>
+    <li>{@link umbraco.directives.directive:umbDrawerFooter umbDrawerFooter}</li>
+</ul>
+
+**/
+    (function () {
+        'use strict';
+        function DrawerViewDirective() {
+            var directive = {
+                restrict: 'E',
+                replace: true,
+                transclude: true,
+                templateUrl: 'views/components/application/umbdrawer/umb-drawer-view.html'
+            };
+            return directive;
+        }
+        angular.module('umbraco.directives').directive('umbDrawerView', DrawerViewDirective);
+    }());
+    /**
 * @ngdoc directive
 * @name umbraco.directives.directive:umbNavigation
 * @restrict E
@@ -733,7 +1154,7 @@
 * @name umbraco.directives.directive:umbSections
 * @restrict E
 **/
-    function sectionsDirective($timeout, $window, navigationService, treeService, sectionResource, appState, eventsService, $location) {
+    function sectionsDirective($timeout, $window, navigationService, treeService, sectionService, appState, eventsService, $location, historyService) {
         return {
             restrict: 'E',
             // restrict to an element
@@ -760,7 +1181,7 @@
                     }
                 };
                 function loadSections() {
-                    sectionResource.getSections().then(function (result) {
+                    sectionService.getSectionsForUser().then(function (result) {
                         scope.sections = result;
                         calculateHeight();
                     });
@@ -825,26 +1246,16 @@
                     scope.userDialog.show = false;
                     scope.userDialog = null;
                 }
+                //toggle the help dialog by raising the global app state to toggle the help drawer
                 scope.helpClick = function () {
-                    if (scope.userDialog) {
-                        closeUserDialog();
-                    }
-                    if (!scope.helpDialog) {
-                        scope.helpDialog = {
-                            view: 'help',
-                            show: true,
-                            close: function (oldModel) {
-                                closeHelpDialog();
-                            }
-                        };
-                    } else {
-                        closeHelpDialog();
-                    }
+                    var showDrawer = appState.getDrawerState('showDrawer');
+                    var drawer = {
+                        view: 'help',
+                        show: !showDrawer
+                    };
+                    appState.setDrawerState('view', drawer.view);
+                    appState.setDrawerState('showDrawer', drawer.show);
                 };
-                function closeHelpDialog() {
-                    scope.helpDialog.show = false;
-                    scope.helpDialog = null;
-                }
                 scope.sectionClick = function (event, section) {
                     if (event.ctrlKey || event.shiftKey || event.metaKey || event.button && event.button === 1    // middle click, >IE9 + everyone else
 ) {
@@ -853,12 +1264,16 @@
                     if (scope.userDialog) {
                         closeUserDialog();
                     }
-                    if (scope.helpDialog) {
-                        closeHelpDialog();
-                    }
                     navigationService.hideSearch();
                     navigationService.showTree(section.alias);
-                    $location.path('/' + section.alias);
+                    //in some cases the section will have a custom route path specified, if there is one we'll use it
+                    if (section.routePath) {
+                        $location.path(section.routePath);
+                    } else {
+                        var lastAccessed = historyService.getLastAccessedItemForSection(section.alias);
+                        var path = lastAccessed != null ? lastAccessed.link : section.alias;
+                        $location.path(path).search('');
+                    }
                 };
                 scope.sectionDblClick = function (section) {
                     navigationService.reloadSection(section.alias);
@@ -882,6 +1297,565 @@
         };
     }
     angular.module('umbraco.directives').directive('umbSections', sectionsDirective);
+    /**
+@ngdoc directive
+@name umbraco.directives.directive:umbTour
+@restrict E
+@scope
+
+@description
+<b>Added in Umbraco 7.8</b>. The tour component is a global component and is already added to the umbraco markup. 
+In the Umbraco UI the tours live in the "Help drawer" which opens when you click the Help-icon in the bottom left corner of Umbraco. 
+You can easily add you own tours to the Help-drawer or show and start tours from 
+anywhere in the Umbraco backoffice. To see a real world example of a custom tour implementation, install <a href="https://our.umbraco.org/projects/starter-kits/the-starter-kit/">The Starter Kit</a> in Umbraco 7.8
+
+<h1><b>Extending the help drawer with custom tours</b></h1>
+The easiet way to add new tours to Umbraco is through the Help-drawer. All it requires is a my-tour.json file. 
+Place the file in <i>App_Plugins/{MyPackage}/backoffice/tours/{my-tour}.json</i> and it will automatically be 
+picked up by Umbraco and shown in the Help-drawer.
+
+<h3><b>The tour object</b></h3>
+The tour object consist of two parts - The overall tour configuration and a list of tour steps. We have split up the tour object for a better overview.
+<pre>
+// The tour config object
+{
+    "name": "My Custom Tour", // (required)
+    "alias": "myCustomTour", // A unique tour alias (required)
+    "group": "My Custom Group" // Used to group tours in the help drawer
+    "groupOrder": 200 // Control the order of tour groups
+    "allowDisable": // Adds a "Don't" show this tour again"-button to the intro step
+    "requiredSections":["content", "media", "mySection"] // Sections that the tour will access while running, if the user does not have access to the required tour sections, the tour will not load.   
+    "steps": [] // tour steps - see next example
+}
+</pre>
+<pre>
+// A tour step object
+{
+    "title": "Title",
+    "content": "<p>Step content</p>",
+    "type": "intro" // makes the step an introduction step,
+    "element": "[data-element='my-table-row']", // the highlighted element
+    "event": "click" // forces the user to click the UI to go to next step
+    "eventElement": "[data-element='my-table-row'] [data-element='my-tour-button']" // specify an element to click inside a highlighted element
+    "elementPreventClick": false // prevents user interaction in the highlighted element
+    "backdropOpacity": 0.4 // the backdrop opacity
+    "view": "" // add a custom view
+    "customProperties" : {} // add any custom properties needed for the custom view
+}
+</pre>
+
+<h1><b>Adding tours to other parts of the Umbraco backoffice</b></h1>
+It is also possible to add a list of custom tours to other parts of the Umbraco backoffice, 
+as an example on a Dashboard in a Custom section. You can then use the {@link umbraco.services.tourService tourService} to start and stop tours but you don't have to register them as part of the tour service.
+
+<h1><b>Using the tour service</b></h1>
+<h3>Markup example - show custom tour</h3>
+<pre>
+    <div ng-controller="My.TourController as vm">
+
+        <div>{{vm.tour.name}}</div>
+        <button type="button" ng-click="vm.startTour()">Start tour</button>
+
+        <!-- This button will be clicked in the tour -->
+        <button data-element="my-tour-button" type="button">Click me</button>
+
+    </div>
+</pre>
+
+<h3>Controller example - show custom tour</h3>
+<pre>
+    (function () {
+        "use strict";
+
+        function TourController(tourService) {
+
+            var vm = this;
+
+            vm.tour = {
+                "name": "My Custom Tour",
+                "alias": "myCustomTour",
+                "steps": [
+                    {
+                        "title": "Welcome to My Custom Tour",
+                        "content": "",
+                        "type": "intro"
+                    },
+                    {
+                        "element": "[data-element='my-tour-button']",
+                        "title": "Click the button",
+                        "content": "Click the button",
+                        "event": "click"
+                    }
+                ]
+            };
+
+            vm.startTour = startTour;
+
+            function startTour() {
+                tourService.startTour(vm.tour);
+            }
+
+        }
+
+        angular.module("umbraco").controller("My.TourController", TourController);
+
+    })();
+</pre>
+
+<h1><b>Custom step views</b></h1>
+In some cases you will need a custom view for one of your tour steps. 
+This could be for validation or for running any other custom logic for that step. 
+We have added a couple of helper components to make it easier to get the step scaffolding to look like a regular tour step. 
+In the following example you see how to run some custom logic before a step goes to the next step.
+
+<h3>Markup example - custom step view</h3>
+<pre>
+    <div ng-controller="My.TourStep as vm">
+
+        <umb-tour-step on-close="model.endTour()">
+                
+            <umb-tour-step-header
+                title="model.currentStep.title">
+            </umb-tour-step-header>
+            
+            <umb-tour-step-content
+                content="model.currentStep.content">
+
+                <!-- Add any custom content here  -->
+
+            </umb-tour-step-content>
+
+            <umb-tour-step-footer class="flex justify-between items-center">
+
+                <umb-tour-step-counter
+                    current-step="model.currentStepIndex + 1"
+                    total-steps="model.steps.length">
+                </umb-tour-step-counter>
+
+                <div>
+                    <umb-button 
+                        size="xs" 
+                        button-style="success" 
+                        type="button" 
+                        action="vm.initNextStep()" 
+                        label="Next">
+                    </umb-button>
+                </div>
+
+            </umb-tour-step-footer>
+
+        </umb-tour-step>
+
+    </div>
+</pre>
+
+<h3>Controller example - custom step view</h3>
+<pre>
+    (function () {
+        "use strict";
+
+        function StepController() {
+
+            var vm = this;
+            
+            vm.initNextStep = initNextStep;
+
+            function initNextStep() {
+                // run logic here before going to the next step
+                $scope.model.nextStep();
+            }
+
+        }
+
+        angular.module("umbraco").controller("My.TourStep", StepController);
+
+    })();
+</pre>
+
+
+<h3>Related services</h3>
+<ul>
+    <li>{@link umbraco.services.tourService tourService}</li>
+</ul>
+
+@param {string} model (<code>binding</code>): Tour object
+
+**/
+    (function () {
+        'use strict';
+        function TourDirective($timeout, $http, $q, tourService, backdropService) {
+            function link(scope, el, attr, ctrl) {
+                var popover;
+                var pulseElement;
+                var pulseTimer;
+                scope.loadingStep = false;
+                scope.elementNotFound = false;
+                scope.model.nextStep = function () {
+                    nextStep();
+                };
+                scope.model.endTour = function () {
+                    unbindEvent();
+                    tourService.endTour(scope.model);
+                    backdropService.close();
+                };
+                scope.model.completeTour = function () {
+                    unbindEvent();
+                    tourService.completeTour(scope.model).then(function () {
+                        backdropService.close();
+                    });
+                };
+                scope.model.disableTour = function () {
+                    unbindEvent();
+                    tourService.disableTour(scope.model).then(function () {
+                        backdropService.close();
+                    });
+                };
+                function onInit() {
+                    popover = el.find('.umb-tour__popover');
+                    pulseElement = el.find('.umb-tour__pulse');
+                    popover.hide();
+                    scope.model.currentStepIndex = 0;
+                    backdropService.open({ disableEventsOnClick: true });
+                    startStep();
+                }
+                function setView() {
+                    if (scope.model.currentStep.view && scope.model.alias) {
+                        //we do this to avoid a hidden dialog to start loading unconfigured views before the first activation
+                        var configuredView = scope.model.currentStep.view;
+                        if (scope.model.currentStep.view.indexOf('.html') === -1) {
+                            var viewAlias = scope.model.currentStep.view.toLowerCase();
+                            var tourAlias = scope.model.alias.toLowerCase();
+                            configuredView = 'views/common/tours/' + tourAlias + '/' + viewAlias + '/' + viewAlias + '.html';
+                        }
+                        if (configuredView !== scope.configuredView) {
+                            scope.configuredView = configuredView;
+                        }
+                    } else {
+                        scope.configuredView = null;
+                    }
+                }
+                function nextStep() {
+                    popover.hide();
+                    pulseElement.hide();
+                    $timeout.cancel(pulseTimer);
+                    scope.model.currentStepIndex++;
+                    // make sure we don't go too far
+                    if (scope.model.currentStepIndex !== scope.model.steps.length) {
+                        startStep();    // tour completed - final step
+                    } else {
+                        scope.loadingStep = true;
+                        waitForPendingRerequests().then(function () {
+                            scope.loadingStep = false;
+                            // clear current step
+                            scope.model.currentStep = {};
+                            // set popover position to center
+                            setPopoverPosition(null);
+                            // remove backdrop hightlight and custom opacity
+                            backdropService.setHighlight(null);
+                            backdropService.setOpacity(null);
+                        });
+                    }
+                }
+                function startStep() {
+                    scope.loadingStep = true;
+                    backdropService.setOpacity(scope.model.steps[scope.model.currentStepIndex].backdropOpacity);
+                    backdropService.setHighlight(null);
+                    waitForPendingRerequests().then(function () {
+                        scope.model.currentStep = scope.model.steps[scope.model.currentStepIndex];
+                        setView();
+                        // if highlight element is set - find it
+                        findHighlightElement();
+                        // if a custom event needs to be bound we do it now
+                        if (scope.model.currentStep.event) {
+                            bindEvent();
+                        }
+                        scope.loadingStep = false;
+                    });
+                }
+                function findHighlightElement() {
+                    scope.elementNotFound = false;
+                    $timeout(function () {
+                        // if an element isn't set - show the popover in the center
+                        if (scope.model.currentStep && !scope.model.currentStep.element) {
+                            setPopoverPosition(null);
+                            return;
+                        }
+                        var element = angular.element(scope.model.currentStep.element);
+                        // we couldn't find the element in the dom - abort and show error
+                        if (element.length === 0) {
+                            scope.elementNotFound = true;
+                            setPopoverPosition(null);
+                            return;
+                        }
+                        var scrollParent = element.scrollParent();
+                        var scrollToCenterOfContainer = element[0].offsetTop - scrollParent[0].clientHeight / 2 + element[0].clientHeight / 2;
+                        // Detect if scroll is needed
+                        if (element[0].offsetTop > scrollParent[0].clientHeight) {
+                            scrollParent.animate({ scrollTop: scrollToCenterOfContainer }, function () {
+                                // Animation complete.
+                                setPopoverPosition(element);
+                                setPulsePosition();
+                                backdropService.setHighlight(scope.model.currentStep.element, scope.model.currentStep.elementPreventClick);
+                            });
+                        } else {
+                            setPopoverPosition(element);
+                            setPulsePosition();
+                            backdropService.setHighlight(scope.model.currentStep.element, scope.model.currentStep.elementPreventClick);
+                        }
+                    });
+                }
+                function setPopoverPosition(element) {
+                    $timeout(function () {
+                        var position = 'center';
+                        var margin = 20;
+                        var css = {};
+                        var popoverWidth = popover.outerWidth();
+                        var popoverHeight = popover.outerHeight();
+                        var popoverOffset = popover.offset();
+                        var documentWidth = angular.element(document).width();
+                        var documentHeight = angular.element(document).height();
+                        if (element) {
+                            var offset = element.offset();
+                            var width = element.outerWidth();
+                            var height = element.outerHeight();
+                            // messure available space on each side of the target element
+                            var space = {
+                                'top': offset.top,
+                                'right': documentWidth - (offset.left + width),
+                                'bottom': documentHeight - (offset.top + height),
+                                'left': offset.left
+                            };
+                            // get the posistion with most available space
+                            position = findMax(space);
+                            if (position === 'top') {
+                                if (offset.left < documentWidth / 2) {
+                                    css.top = offset.top - popoverHeight - margin;
+                                    css.left = offset.left;
+                                } else {
+                                    css.top = offset.top - popoverHeight - margin;
+                                    css.left = offset.left - popoverWidth + width;
+                                }
+                            }
+                            if (position === 'right') {
+                                if (offset.top < documentHeight / 2) {
+                                    css.top = offset.top;
+                                    css.left = offset.left + width + margin;
+                                } else {
+                                    css.top = offset.top + height - popoverHeight;
+                                    css.left = offset.left + width + margin;
+                                }
+                            }
+                            if (position === 'bottom') {
+                                if (offset.left < documentWidth / 2) {
+                                    css.top = offset.top + height + margin;
+                                    css.left = offset.left;
+                                } else {
+                                    css.top = offset.top + height + margin;
+                                    css.left = offset.left - popoverWidth + width;
+                                }
+                            }
+                            if (position === 'left') {
+                                if (offset.top < documentHeight / 2) {
+                                    css.top = offset.top;
+                                    css.left = offset.left - popoverWidth - margin;
+                                } else {
+                                    css.top = offset.top + height - popoverHeight;
+                                    css.left = offset.left - popoverWidth - margin;
+                                }
+                            }
+                        } else {
+                            // if there is no dom element center the popover
+                            css.top = 'calc(50% - ' + popoverHeight / 2 + 'px)';
+                            css.left = 'calc(50% - ' + popoverWidth / 2 + 'px)';
+                        }
+                        popover.css(css).fadeIn('fast');
+                    });
+                }
+                function setPulsePosition() {
+                    if (scope.model.currentStep.event) {
+                        pulseTimer = $timeout(function () {
+                            var clickElementSelector = scope.model.currentStep.eventElement ? scope.model.currentStep.eventElement : scope.model.currentStep.element;
+                            var clickElement = $(clickElementSelector);
+                            var offset = clickElement.offset();
+                            var width = clickElement.outerWidth();
+                            var height = clickElement.outerHeight();
+                            pulseElement.css({
+                                'width': width,
+                                'height': height,
+                                'left': offset.left,
+                                'top': offset.top
+                            });
+                            pulseElement.fadeIn();
+                        }, 1000);
+                    }
+                }
+                function waitForPendingRerequests() {
+                    var deferred = $q.defer();
+                    var timer = window.setInterval(function () {
+                        // check for pending requests both in angular and on the document
+                        if ($http.pendingRequests.length === 0 && document.readyState === 'complete') {
+                            $timeout(function () {
+                                deferred.resolve();
+                                clearInterval(timer);
+                            });
+                        }
+                    }, 50);
+                    return deferred.promise;
+                }
+                function findMax(obj) {
+                    var keys = Object.keys(obj);
+                    var max = keys[0];
+                    for (var i = 1, n = keys.length; i < n; ++i) {
+                        var k = keys[i];
+                        if (obj[k] > obj[max]) {
+                            max = k;
+                        }
+                    }
+                    return max;
+                }
+                function bindEvent() {
+                    var bindToElement = scope.model.currentStep.element;
+                    var eventName = scope.model.currentStep.event + '.step-' + scope.model.currentStepIndex;
+                    var removeEventName = 'remove.step-' + scope.model.currentStepIndex;
+                    var handled = false;
+                    if (scope.model.currentStep.eventElement) {
+                        bindToElement = scope.model.currentStep.eventElement;
+                    }
+                    $(bindToElement).on(eventName, function () {
+                        if (!handled) {
+                            unbindEvent();
+                            nextStep();
+                            handled = true;
+                        }
+                    });
+                    // Hack: we do this to handle cases where ng-if is used and removes the element we need to click.
+                    // for some reason it seems the elements gets removed before the event is raised. This is a temp solution which assumes:
+                    // "if you ask me to click on an element, and it suddenly gets removed from the dom, let's go on to the next step".
+                    $(bindToElement).on(removeEventName, function () {
+                        if (!handled) {
+                            unbindEvent();
+                            nextStep();
+                            handled = true;
+                        }
+                    });
+                }
+                function unbindEvent() {
+                    var eventName = scope.model.currentStep.event + '.step-' + scope.model.currentStepIndex;
+                    var removeEventName = 'remove.step-' + scope.model.currentStepIndex;
+                    if (scope.model.currentStep.eventElement) {
+                        angular.element(scope.model.currentStep.eventElement).off(eventName);
+                        angular.element(scope.model.currentStep.eventElement).off(removeEventName);
+                    } else {
+                        angular.element(scope.model.currentStep.element).off(eventName);
+                        angular.element(scope.model.currentStep.element).off(removeEventName);
+                    }
+                }
+                function resize() {
+                    findHighlightElement();
+                }
+                onInit();
+                $(window).on('resize.umbTour', resize);
+                scope.$on('$destroy', function () {
+                    $(window).off('resize.umbTour');
+                    unbindEvent();
+                    $timeout.cancel(pulseTimer);
+                });
+            }
+            var directive = {
+                transclude: true,
+                restrict: 'E',
+                replace: true,
+                templateUrl: 'views/components/application/umb-tour.html',
+                link: link,
+                scope: { model: '=' }
+            };
+            return directive;
+        }
+        angular.module('umbraco.directives').directive('umbTour', TourDirective);
+    }());
+    (function () {
+        'use strict';
+        function TourStepDirective() {
+            function link(scope, element, attrs, ctrl) {
+                scope.close = function () {
+                    if (scope.onClose) {
+                        scope.onClose();
+                    }
+                };
+            }
+            var directive = {
+                restrict: 'E',
+                replace: true,
+                transclude: true,
+                templateUrl: 'views/components/application/umbtour/umb-tour-step.html',
+                scope: {
+                    size: '@?',
+                    onClose: '&?',
+                    hideClose: '=?'
+                },
+                link: link
+            };
+            return directive;
+        }
+        angular.module('umbraco.directives').directive('umbTourStep', TourStepDirective);
+    }());
+    (function () {
+        'use strict';
+        function TourStepContentDirective() {
+            var directive = {
+                restrict: 'E',
+                replace: true,
+                transclude: true,
+                templateUrl: 'views/components/application/umbtour/umb-tour-step-content.html',
+                scope: { content: '=' }
+            };
+            return directive;
+        }
+        angular.module('umbraco.directives').directive('umbTourStepContent', TourStepContentDirective);
+    }());
+    (function () {
+        'use strict';
+        function TourStepCounterDirective() {
+            var directive = {
+                restrict: 'E',
+                replace: true,
+                templateUrl: 'views/components/application/umbtour/umb-tour-step-counter.html',
+                scope: {
+                    currentStep: '=',
+                    totalSteps: '='
+                }
+            };
+            return directive;
+        }
+        angular.module('umbraco.directives').directive('umbTourStepCounter', TourStepCounterDirective);
+    }());
+    (function () {
+        'use strict';
+        function TourStepFooterDirective() {
+            var directive = {
+                restrict: 'E',
+                replace: true,
+                transclude: true,
+                templateUrl: 'views/components/application/umbtour/umb-tour-step-footer.html'
+            };
+            return directive;
+        }
+        angular.module('umbraco.directives').directive('umbTourStepFooter', TourStepFooterDirective);
+    }());
+    (function () {
+        'use strict';
+        function TourStepHeaderDirective() {
+            var directive = {
+                restrict: 'E',
+                replace: true,
+                transclude: true,
+                templateUrl: 'views/components/application/umbtour/umb-tour-step-header.html',
+                scope: { title: '=' }
+            };
+            return directive;
+        }
+        angular.module('umbraco.directives').directive('umbTourStepHeader', TourStepHeaderDirective);
+    }());
     /**
 @ngdoc directive
 @name umbraco.directives.directive:umbButton
@@ -941,12 +1915,13 @@ Use this directive to render an umbraco button. The directive can be used to gen
 @param {callback} action The button action which should be performed when the button is clicked.
 @param {string=} href Url/Path to navigato to.
 @param {string=} type Set the button type ("button" or "submit").
-@param {string=} buttonStyle Set the style of the button. The directive uses the default bootstrap styles ("primary", "info", "success", "warning", "danger", "inverse", "link").
+@param {string=} buttonStyle Set the style of the button. The directive uses the default bootstrap styles ("primary", "info", "success", "warning", "danger", "inverse", "link", "block"). Pass in array to add multple styles [success,block].
 @param {string=} state Set a progress state on the button ("init", "busy", "success", "error").
 @param {string=} shortcut Set a keyboard shortcut for the button ("ctrl+c").
 @param {string=} label Set the button label.
 @param {string=} labelKey Set a localization key to make a multi lingual button ("general_buttonText").
-@param {string=} icon Set a button icon. Can only be used when buttonStyle is "link".
+@param {string=} icon Set a button icon.
+@param {string=} size Set a button icon ("xs", "m", "l", "xl").
 @param {boolean=} disabled Set to <code>true</code> to disable the button.
 **/
     (function () {
@@ -955,11 +1930,30 @@ Use this directive to render an umbraco button. The directive can be used to gen
             function link(scope, el, attr, ctrl) {
                 scope.style = null;
                 function activate() {
+                    scope.blockElement = false;
                     if (!scope.state) {
                         scope.state = 'init';
                     }
                     if (scope.buttonStyle) {
-                        scope.style = 'btn-' + scope.buttonStyle;
+                        // make it possible to pass in multiple styles
+                        if (scope.buttonStyle.startsWith('[') && scope.buttonStyle.endsWith(']')) {
+                            // when using an attr it will always be a string so we need to remove square brackets
+                            // and turn it into and array
+                            var withoutBrackets = scope.buttonStyle.replace(/[\[\]']+/g, '');
+                            // split array by , + make sure to catch whitespaces
+                            var array = withoutBrackets.split(/\s?,\s?/g);
+                            angular.forEach(array, function (item) {
+                                scope.style = scope.style + ' ' + 'btn-' + item;
+                                if (item === 'block') {
+                                    scope.blockElement = true;
+                                }
+                            });
+                        } else {
+                            scope.style = 'btn-' + scope.buttonStyle;
+                            if (scope.buttonStyle === 'block') {
+                                scope.blockElement = true;
+                            }
+                        }
                     }
                 }
                 activate();
@@ -991,7 +1985,9 @@ Use this directive to render an umbraco button. The directive can be used to gen
                     label: '@?',
                     labelKey: '@?',
                     icon: '@?',
-                    disabled: '='
+                    disabled: '=',
+                    size: '@?',
+                    alias: '@?'
                 }
             };
             return directive;
@@ -1106,6 +2102,650 @@ Use this directive to render a button with a dropdown of alternative actions.
             return directive;
         }
         angular.module('umbraco.directives').directive('umbButtonGroup', ButtonGroupDirective);
+    }());
+    /**
+@ngdoc directive
+@name umbraco.directives.directive:umbToggle
+@restrict E
+@scope
+
+@description
+<b>Added in Umbraco version 7.7.0</b> Use this directive to render an umbraco toggle.
+
+<h3>Markup example</h3>
+<pre>
+    <div ng-controller="My.Controller as vm">
+
+        <umb-toggle
+            checked="vm.checked"
+            on-click="vm.toggle()">
+        </umb-toggle>
+
+        <umb-toggle
+            checked="vm.checked"
+            on-click="vm.toggle()"
+            show-labels="true"
+            label-on="Start"
+            label-off="Stop"
+            label-position="right"
+            hide-icons="true">
+        </umb-toggle>
+
+    </div>
+</pre>
+
+<h3>Controller example</h3>
+<pre>
+    (function () {
+        "use strict";
+
+        function Controller() {
+
+            var vm = this;
+            vm.checked = false;
+
+            vm.toggle = toggle;
+
+            function toggle() {
+                vm.checked = !vm.checked;
+            }
+        }
+
+        angular.module("umbraco").controller("My.Controller", Controller);
+
+    })();
+</pre>
+
+@param {boolean} checked Set to <code>true</code> or <code>false</code> to toggle the switch.
+@param {callback} onClick The function which should be called when the toggle is clicked.
+@param {string=} showLabels Set to <code>true</code> or <code>false</code> to show a "On" or "Off" label next to the switch.
+@param {string=} labelOn Set a custom label for when the switched is turned on. It will default to "On".
+@param {string=} labelOff Set a custom label for when the switched is turned off. It will default to "Off".
+@param {string=} labelPosition Sets the label position to the left or right of the switch. It will default to "left" ("left", "right").
+@param {string=} hideIcons Set to <code>true</code> or <code>false</code> to hide the icons on the switch.
+
+**/
+    (function () {
+        'use strict';
+        function ToggleDirective(localizationService) {
+            function link(scope, el, attr, ctrl) {
+                scope.displayLabelOn = '';
+                scope.displayLabelOff = '';
+                function onInit() {
+                    setLabelText();
+                }
+                function setLabelText() {
+                    // set default label for "on"
+                    if (scope.labelOn) {
+                        scope.displayLabelOn = scope.labelOn;
+                    } else {
+                        localizationService.localize('general_on').then(function (value) {
+                            scope.displayLabelOn = value;
+                        });
+                    }
+                    // set default label for "Off"
+                    if (scope.labelOff) {
+                        scope.displayLabelOff = scope.labelOff;
+                    } else {
+                        localizationService.localize('general_off').then(function (value) {
+                            scope.displayLabelOff = value;
+                        });
+                    }
+                }
+                scope.click = function () {
+                    if (scope.onClick) {
+                        scope.onClick();
+                    }
+                };
+                onInit();
+            }
+            var directive = {
+                restrict: 'E',
+                replace: true,
+                templateUrl: 'views/components/buttons/umb-toggle.html',
+                scope: {
+                    checked: '=',
+                    onClick: '&',
+                    labelOn: '@?',
+                    labelOff: '@?',
+                    labelPosition: '@?',
+                    showLabels: '@?',
+                    hideIcons: '@?'
+                },
+                link: link
+            };
+            return directive;
+        }
+        angular.module('umbraco.directives').directive('umbToggle', ToggleDirective);
+    }());
+    (function () {
+        'use strict';
+        function ContentEditController($rootScope, $scope, $routeParams, $q, $timeout, $window, $location, appState, contentResource, entityResource, navigationService, notificationsService, angularHelper, serverValidationManager, contentEditingHelper, treeService, fileManager, formHelper, umbRequestHelper, keyboardService, umbModelMapper, editorState, $http, eventsService, relationResource) {
+            var evts = [];
+            //setup scope vars
+            $scope.defaultButton = null;
+            $scope.subButtons = [];
+            $scope.page = {};
+            $scope.page.loading = false;
+            $scope.page.menu = {};
+            $scope.page.menu.currentNode = null;
+            $scope.page.menu.currentSection = appState.getSectionState('currentSection');
+            $scope.page.listViewPath = null;
+            $scope.page.isNew = $scope.isNew ? true : false;
+            $scope.page.buttonGroupState = 'init';
+            $scope.allowOpen = true;
+            function init(content) {
+                createButtons(content);
+                editorState.set($scope.content);
+                //We fetch all ancestors of the node to generate the footer breadcrumb navigation
+                if (!$scope.page.isNew) {
+                    if (content.parentId && content.parentId !== -1) {
+                        entityResource.getAncestors(content.id, 'document').then(function (anc) {
+                            $scope.ancestors = anc;
+                        });
+                    }
+                }
+                evts.push(eventsService.on('editors.content.changePublishDate', function (event, args) {
+                    createButtons(args.node);
+                }));
+                evts.push(eventsService.on('editors.content.changeUnpublishDate', function (event, args) {
+                    createButtons(args.node);
+                }));
+                // We don't get the info tab from the server from version 7.8 so we need to manually add it
+                contentEditingHelper.addInfoTab($scope.content.tabs);
+            }
+            function getNode() {
+                $scope.page.loading = true;
+                //we are editing so get the content item from the server
+                $scope.getMethod()($scope.contentId).then(function (data) {
+                    $scope.content = data;
+                    if (data.isChildOfListView && data.trashed === false) {
+                        $scope.page.listViewPath = $routeParams.page ? '/content/content/edit/' + data.parentId + '?page=' + $routeParams.page : '/content/content/edit/' + data.parentId;
+                    }
+                    init($scope.content);
+                    //in one particular special case, after we've created a new item we redirect back to the edit
+                    // route but there might be server validation errors in the collection which we need to display
+                    // after the redirect, so we will bind all subscriptions which will show the server validation errors
+                    // if there are any and then clear them so the collection no longer persists them.
+                    serverValidationManager.executeAndClearAllSubscriptions();
+                    syncTreeNode($scope.content, data.path, true);
+                    resetLastListPageNumber($scope.content);
+                    $scope.page.loading = false;
+                });
+            }
+            function createButtons(content) {
+                $scope.page.buttonGroupState = 'init';
+                var buttons = contentEditingHelper.configureContentEditorButtons({
+                    create: $scope.page.isNew,
+                    content: content,
+                    methods: {
+                        saveAndPublish: $scope.saveAndPublish,
+                        sendToPublish: $scope.sendToPublish,
+                        save: $scope.save,
+                        unPublish: $scope.unPublish
+                    }
+                });
+                $scope.defaultButton = buttons.defaultButton;
+                $scope.subButtons = buttons.subButtons;
+            }
+            /** Syncs the content item to it's tree node - this occurs on first load and after saving */
+            function syncTreeNode(content, path, initialLoad) {
+                if (!$scope.content.isChildOfListView) {
+                    navigationService.syncTree({
+                        tree: $scope.treeAlias,
+                        path: path.split(','),
+                        forceReload: initialLoad !== true
+                    }).then(function (syncArgs) {
+                        $scope.page.menu.currentNode = syncArgs.node;
+                    });
+                } else if (initialLoad === true) {
+                    //it's a child item, just sync the ui node to the parent
+                    navigationService.syncTree({
+                        tree: $scope.treeAlias,
+                        path: path.substring(0, path.lastIndexOf(',')).split(','),
+                        forceReload: initialLoad !== true
+                    });
+                    //if this is a child of a list view and it's the initial load of the editor, we need to get the tree node 
+                    // from the server so that we can load in the actions menu.
+                    umbRequestHelper.resourcePromise($http.get(content.treeNodeUrl), 'Failed to retrieve data for child node ' + content.id).then(function (node) {
+                        $scope.page.menu.currentNode = node;
+                    });
+                }
+            }
+            // This is a helper method to reduce the amount of code repitition for actions: Save, Publish, SendToPublish
+            function performSave(args) {
+                var deferred = $q.defer();
+                $scope.page.buttonGroupState = 'busy';
+                contentEditingHelper.contentEditorPerformSave({
+                    statusMessage: args.statusMessage,
+                    saveMethod: args.saveMethod,
+                    scope: $scope,
+                    content: $scope.content,
+                    action: args.action
+                }).then(function (data) {
+                    //success            
+                    init($scope.content);
+                    syncTreeNode($scope.content, data.path);
+                    $scope.page.buttonGroupState = 'success';
+                    deferred.resolve(data);
+                }, function (err) {
+                    //error
+                    if (err) {
+                        editorState.set($scope.content);
+                    }
+                    $scope.page.buttonGroupState = 'error';
+                    deferred.reject(err);
+                });
+                return deferred.promise;
+            }
+            function resetLastListPageNumber(content) {
+                // We're using rootScope to store the page number for list views, so if returning to the list
+                // we can restore the page.  If we've moved on to edit a piece of content that's not the list or it's children
+                // we should remove this so as not to confuse if navigating to a different list
+                if (!content.isChildOfListView && !content.isContainer) {
+                    $rootScope.lastListViewPageViewed = null;
+                }
+            }
+            if ($scope.page.isNew) {
+                $scope.page.loading = true;
+                //we are creating so get an empty content item
+                $scope.getScaffoldMethod()().then(function (data) {
+                    $scope.content = data;
+                    init($scope.content);
+                    resetLastListPageNumber($scope.content);
+                    $scope.page.loading = false;
+                });
+            } else {
+                getNode();
+            }
+            $scope.unPublish = function () {
+                if (formHelper.submitForm({
+                        scope: $scope,
+                        statusMessage: 'Unpublishing...',
+                        skipValidation: true
+                    })) {
+                    $scope.page.buttonGroupState = 'busy';
+                    contentResource.unPublish($scope.content.id).then(function (data) {
+                        formHelper.resetForm({
+                            scope: $scope,
+                            notifications: data.notifications
+                        });
+                        contentEditingHelper.handleSuccessfulSave({
+                            scope: $scope,
+                            savedContent: data,
+                            rebindCallback: contentEditingHelper.reBindChangedProperties($scope.content, data)
+                        });
+                        init($scope.content);
+                        syncTreeNode($scope.content, data.path);
+                        $scope.page.buttonGroupState = 'success';
+                    }, function (err) {
+                        $scope.page.buttonGroupState = 'error';
+                    });
+                }
+            };
+            $scope.sendToPublish = function () {
+                return performSave({
+                    saveMethod: contentResource.sendToPublish,
+                    statusMessage: 'Sending...',
+                    action: 'sendToPublish'
+                });
+            };
+            $scope.saveAndPublish = function () {
+                return performSave({
+                    saveMethod: contentResource.publish,
+                    statusMessage: 'Publishing...',
+                    action: 'publish'
+                });
+            };
+            $scope.save = function () {
+                return performSave({
+                    saveMethod: $scope.saveMethod(),
+                    statusMessage: 'Saving...',
+                    action: 'save'
+                });
+            };
+            $scope.preview = function (content) {
+                if (!$scope.busy) {
+                    // Chromes popup blocker will kick in if a window is opened 
+                    // without the initial scoped request. This trick will fix that.
+                    //  
+                    var previewWindow = $window.open('preview/?init=true&id=' + content.id, 'umbpreview');
+                    // Build the correct path so both /#/ and #/ work.
+                    var redirect = Umbraco.Sys.ServerVariables.umbracoSettings.umbracoPath + '/preview/?id=' + content.id;
+                    //The user cannot save if they don't have access to do that, in which case we just want to preview
+                    //and that's it otherwise they'll get an unauthorized access message
+                    if (!_.contains(content.allowedActions, 'A')) {
+                        previewWindow.location.href = redirect;
+                    } else {
+                        $scope.save().then(function (data) {
+                            previewWindow.location.href = redirect;
+                        });
+                    }
+                }
+            };
+            $scope.restore = function (content) {
+                $scope.page.buttonRestore = 'busy';
+                relationResource.getByChildId(content.id, 'relateParentDocumentOnDelete').then(function (data) {
+                    var relation = null;
+                    var target = null;
+                    var error = {
+                        headline: 'Cannot automatically restore this item',
+                        content: 'Use the Move menu item to move it manually'
+                    };
+                    if (data.length == 0) {
+                        notificationsService.error(error.headline, 'There is no \'restore\' relation found for this node. Use the Move menu item to move it manually.');
+                        $scope.page.buttonRestore = 'error';
+                        return;
+                    }
+                    relation = data[0];
+                    if (relation.parentId == -1) {
+                        target = {
+                            id: -1,
+                            name: 'Root'
+                        };
+                        moveNode(content, target);
+                    } else {
+                        contentResource.getById(relation.parentId).then(function (data) {
+                            target = data;
+                            // make sure the target item isn't in the recycle bin
+                            if (target.path.indexOf('-20') !== -1) {
+                                notificationsService.error(error.headline, 'The item you want to restore it under (' + target.name + ') is in the recycle bin. Use the Move menu item to move the item manually.');
+                                $scope.page.buttonRestore = 'error';
+                                return;
+                            }
+                            moveNode(content, target);
+                        }, function (err) {
+                            $scope.page.buttonRestore = 'error';
+                            notificationsService.error(error.headline, error.content);
+                        });
+                    }
+                }, function (err) {
+                    $scope.page.buttonRestore = 'error';
+                    notificationsService.error(error.headline, error.content);
+                });
+            };
+            function moveNode(node, target) {
+                contentResource.move({
+                    'parentId': target.id,
+                    'id': node.id
+                }).then(function (path) {
+                    // remove the node that we're working on
+                    if ($scope.page.menu.currentNode) {
+                        treeService.removeNode($scope.page.menu.currentNode);
+                    }
+                    // sync the destination node
+                    navigationService.syncTree({
+                        tree: 'content',
+                        path: path,
+                        forceReload: true,
+                        activate: false
+                    });
+                    $scope.page.buttonRestore = 'success';
+                    notificationsService.success('Successfully restored ' + node.name + ' to ' + target.name);
+                    // reload the node
+                    getNode();
+                }, function (err) {
+                    $scope.page.buttonRestore = 'error';
+                    notificationsService.error('Cannot automatically restore this item', err);
+                });
+            }
+            //ensure to unregister from all events!
+            $scope.$on('$destroy', function () {
+                for (var e in evts) {
+                    eventsService.unsubscribe(evts[e]);
+                }
+            });
+        }
+        function createDirective() {
+            var directive = {
+                restrict: 'E',
+                replace: true,
+                templateUrl: 'views/components/content/edit.html',
+                controller: 'Umbraco.Editors.Content.EditorDirectiveController',
+                scope: {
+                    contentId: '=',
+                    isNew: '=?',
+                    treeAlias: '@',
+                    page: '=?',
+                    saveMethod: '&',
+                    getMethod: '&',
+                    getScaffoldMethod: '&?'
+                }
+            };
+            return directive;
+        }
+        angular.module('umbraco.directives').controller('Umbraco.Editors.Content.EditorDirectiveController', ContentEditController);
+        angular.module('umbraco.directives').directive('contentEditor', createDirective);
+    }());
+    (function () {
+        'use strict';
+        function ContentNodeInfoDirective($timeout, $location, logResource, eventsService, userService, localizationService, dateHelper) {
+            function link(scope, element, attrs, ctrl) {
+                var evts = [];
+                var isInfoTab = false;
+                scope.publishStatus = {};
+                scope.disableTemplates = Umbraco.Sys.ServerVariables.features.disabledFeatures.disableTemplates;
+                function onInit() {
+                    scope.allowOpen = true;
+                    scope.datePickerConfig = {
+                        pickDate: true,
+                        pickTime: true,
+                        useSeconds: false,
+                        format: 'YYYY-MM-DD HH:mm',
+                        icons: {
+                            time: 'icon-time',
+                            date: 'icon-calendar',
+                            up: 'icon-chevron-up',
+                            down: 'icon-chevron-down'
+                        }
+                    };
+                    scope.auditTrailOptions = { 'id': scope.node.id };
+                    // get available templates
+                    scope.availableTemplates = scope.node.allowedTemplates;
+                    // get document type details
+                    scope.documentType = scope.node.documentType;
+                    // make sure dates are formatted to the user's locale
+                    formatDatesToLocal();
+                    setNodePublishStatus(scope.node);
+                }
+                scope.auditTrailPageChange = function (pageNumber) {
+                    scope.auditTrailOptions.pageNumber = pageNumber;
+                    loadAuditTrail();
+                };
+                scope.openDocumentType = function (documentType) {
+                    var url = '/settings/documenttypes/edit/' + documentType.id;
+                    $location.url(url);
+                };
+                scope.updateTemplate = function (templateAlias) {
+                    // update template value
+                    scope.node.template = templateAlias;
+                };
+                scope.datePickerChange = function (event, type) {
+                    if (type === 'publish') {
+                        setPublishDate(event.date.format('YYYY-MM-DD HH:mm'));
+                    } else if (type === 'unpublish') {
+                        setUnpublishDate(event.date.format('YYYY-MM-DD HH:mm'));
+                    }
+                };
+                scope.clearPublishDate = function () {
+                    clearPublishDate();
+                };
+                scope.clearUnpublishDate = function () {
+                    clearUnpublishDate();
+                };
+                function loadAuditTrail() {
+                    scope.loadingAuditTrail = true;
+                    logResource.getPagedEntityLog(scope.auditTrailOptions).then(function (data) {
+                        // get current backoffice user and format dates
+                        userService.getCurrentUser().then(function (currentUser) {
+                            angular.forEach(data.items, function (item) {
+                                item.timestampFormatted = dateHelper.getLocalDate(item.timestamp, currentUser.locale, 'LLL');
+                            });
+                        });
+                        scope.auditTrail = data.items;
+                        scope.auditTrailOptions.pageNumber = data.pageNumber;
+                        scope.auditTrailOptions.pageSize = data.pageSize;
+                        scope.auditTrailOptions.totalItems = data.totalItems;
+                        scope.auditTrailOptions.totalPages = data.totalPages;
+                        setAuditTrailLogTypeColor(scope.auditTrail);
+                        scope.loadingAuditTrail = false;
+                    });
+                }
+                function setAuditTrailLogTypeColor(auditTrail) {
+                    angular.forEach(auditTrail, function (item) {
+                        switch (item.logType) {
+                        case 'Publish':
+                            item.logTypeColor = 'success';
+                            break;
+                        case 'UnPublish':
+                        case 'Delete':
+                            item.logTypeColor = 'danger';
+                            break;
+                        default:
+                            item.logTypeColor = 'gray';
+                        }
+                    });
+                }
+                function setNodePublishStatus(node) {
+                    // deleted node
+                    if (node.trashed === true) {
+                        scope.publishStatus.label = localizationService.localize('general_deleted');
+                        scope.publishStatus.color = 'danger';
+                    }
+                    // unpublished node
+                    if (node.published === false && node.trashed === false) {
+                        scope.publishStatus.label = localizationService.localize('content_unpublished');
+                        scope.publishStatus.color = 'gray';
+                    }
+                    // published node
+                    if (node.hasPublishedVersion === true && node.publishDate && node.published === true) {
+                        scope.publishStatus.label = localizationService.localize('content_published');
+                        scope.publishStatus.color = 'success';
+                    }
+                    // published node with pending changes
+                    if (node.hasPublishedVersion === true && node.publishDate && node.published === false) {
+                        scope.publishStatus.label = localizationService.localize('content_publishedPendingChanges');
+                        scope.publishStatus.color = 'success';
+                    }
+                }
+                function setPublishDate(date) {
+                    if (!date) {
+                        return;
+                    }
+                    //The date being passed in here is the user's local date/time that they have selected
+                    //we need to convert this date back to the server date on the model.
+                    var serverTime = dateHelper.convertToServerStringTime(moment(date), Umbraco.Sys.ServerVariables.application.serverTimeOffset);
+                    // update publish value
+                    scope.node.releaseDate = serverTime;
+                    // make sure dates are formatted to the user's locale
+                    formatDatesToLocal();
+                    // emit event
+                    var args = {
+                        node: scope.node,
+                        date: date
+                    };
+                    eventsService.emit('editors.content.changePublishDate', args);
+                }
+                function clearPublishDate() {
+                    // update publish value
+                    scope.node.releaseDate = null;
+                    // emit event
+                    var args = {
+                        node: scope.node,
+                        date: null
+                    };
+                    eventsService.emit('editors.content.changePublishDate', args);
+                }
+                function setUnpublishDate(date) {
+                    if (!date) {
+                        return;
+                    }
+                    //The date being passed in here is the user's local date/time that they have selected
+                    //we need to convert this date back to the server date on the model.
+                    var serverTime = dateHelper.convertToServerStringTime(moment(date), Umbraco.Sys.ServerVariables.application.serverTimeOffset);
+                    // update publish value
+                    scope.node.removeDate = serverTime;
+                    // make sure dates are formatted to the user's locale
+                    formatDatesToLocal();
+                    // emit event
+                    var args = {
+                        node: scope.node,
+                        date: date
+                    };
+                    eventsService.emit('editors.content.changeUnpublishDate', args);
+                }
+                function clearUnpublishDate() {
+                    // update publish value
+                    scope.node.removeDate = null;
+                    // emit event
+                    var args = {
+                        node: scope.node,
+                        date: null
+                    };
+                    eventsService.emit('editors.content.changeUnpublishDate', args);
+                }
+                function ucfirst(string) {
+                    return string.charAt(0).toUpperCase() + string.slice(1);
+                }
+                function formatDatesToLocal() {
+                    // get current backoffice user and format dates
+                    userService.getCurrentUser().then(function (currentUser) {
+                        scope.node.createDateFormatted = dateHelper.getLocalDate(scope.node.createDate, currentUser.locale, 'LLL');
+                        scope.node.releaseDateYear = scope.node.releaseDate ? ucfirst(dateHelper.getLocalDate(scope.node.releaseDate, currentUser.locale, 'YYYY')) : null;
+                        scope.node.releaseDateMonth = scope.node.releaseDate ? ucfirst(dateHelper.getLocalDate(scope.node.releaseDate, currentUser.locale, 'MMMM')) : null;
+                        scope.node.releaseDateDayNumber = scope.node.releaseDate ? ucfirst(dateHelper.getLocalDate(scope.node.releaseDate, currentUser.locale, 'DD')) : null;
+                        scope.node.releaseDateDay = scope.node.releaseDate ? ucfirst(dateHelper.getLocalDate(scope.node.releaseDate, currentUser.locale, 'dddd')) : null;
+                        scope.node.releaseDateTime = scope.node.releaseDate ? ucfirst(dateHelper.getLocalDate(scope.node.releaseDate, currentUser.locale, 'HH:mm')) : null;
+                        scope.node.removeDateYear = scope.node.removeDate ? ucfirst(dateHelper.getLocalDate(scope.node.removeDate, currentUser.locale, 'YYYY')) : null;
+                        scope.node.removeDateMonth = scope.node.removeDate ? ucfirst(dateHelper.getLocalDate(scope.node.removeDate, currentUser.locale, 'MMMM')) : null;
+                        scope.node.removeDateDayNumber = scope.node.removeDate ? ucfirst(dateHelper.getLocalDate(scope.node.removeDate, currentUser.locale, 'DD')) : null;
+                        scope.node.removeDateDay = scope.node.removeDate ? ucfirst(dateHelper.getLocalDate(scope.node.removeDate, currentUser.locale, 'dddd')) : null;
+                        scope.node.removeDateTime = scope.node.removeDate ? ucfirst(dateHelper.getLocalDate(scope.node.removeDate, currentUser.locale, 'HH:mm')) : null;
+                    });
+                }
+                // load audit trail when on the info tab
+                evts.push(eventsService.on('app.tabChange', function (event, args) {
+                    $timeout(function () {
+                        if (args.id === -1) {
+                            isInfoTab = true;
+                            loadAuditTrail();
+                        } else {
+                            isInfoTab = false;
+                        }
+                    });
+                }));
+                // watch for content updates - reload content when node is saved, published etc.
+                scope.$watch('node.updateDate', function (newValue, oldValue) {
+                    if (!newValue) {
+                        return;
+                    }
+                    if (newValue === oldValue) {
+                        return;
+                    }
+                    if (isInfoTab) {
+                        loadAuditTrail();
+                        formatDatesToLocal();
+                        setNodePublishStatus(scope.node);
+                    }
+                });
+                //ensure to unregister from all events!
+                scope.$on('$destroy', function () {
+                    for (var e in evts) {
+                        eventsService.unsubscribe(evts[e]);
+                    }
+                });
+                onInit();
+            }
+            var directive = {
+                restrict: 'E',
+                replace: true,
+                templateUrl: 'views/components/content/umb-content-node-info.html',
+                scope: { node: '=' },
+                link: link
+            };
+            return directive;
+        }
+        angular.module('umbraco.directives').directive('umbContentNodeInfo', ContentNodeInfoDirective);
     }());
     /**
 @ngdoc directive
@@ -1871,8 +3511,8 @@ Use this directive to construct a header inside the main editor window.
                                 } else {
                                     scope.icon = model.icon;
                                 }
-                                // set form to dirty
-                                ctrl.$setDirty();
+                                // set the icon form to dirty
+                                scope.iconForm.$setDirty();
                             }
                             scope.dialogModel.show = false;
                             scope.dialogModel = null;
@@ -1881,7 +3521,6 @@ Use this directive to construct a header inside the main editor window.
                 };
             }
             var directive = {
-                require: '^form',
                 transclude: true,
                 restrict: 'E',
                 replace: true,
@@ -2260,9 +3899,8 @@ Use this directive to construct the main editor window.
                 if (els.indexOf(el) >= 0) {
                     return;
                 }
-                // ignore children of links and buttons
                 // ignore clicks on new overlay
-                var parents = $(event.target).parents('a,button,.umb-overlay');
+                var parents = $(event.target).parents('a,button,.umb-overlay,.umb-tour');
                 if (parents.length > 0) {
                     return;
                 }
@@ -3098,7 +4736,9 @@ will override element type to textarea and add own attribute ngModel tied to jso
                                 toolbar: toolbar,
                                 content_css: stylesheets,
                                 style_formats: styleFormats,
-                                autoresize_bottom_margin: 0
+                                autoresize_bottom_margin: 0,
+                                //see http://archive.tinymce.com/wiki.php/Configuration:cache_suffix
+                                cache_suffix: '?umb__rnd=' + Umbraco.Sys.ServerVariables.application.cacheBuster
                             };
                             if (tinyMceConfig.customConfig) {
                                 //if there is some custom config, we need to see if the string value of each item might actually be json and if so, we need to
@@ -3120,6 +4760,12 @@ will override element type to textarea and add own attribute ngModel tied to jso
                                             } catch (e) {
                                             }
                                         }
+                                    }
+                                    if (val === 'true') {
+                                        tinyMceConfig.customConfig[i] = true;
+                                    }
+                                    if (val === 'false') {
+                                        tinyMceConfig.customConfig[i] = false;
                                     }
                                 }
                                 angular.extend(baseLineConfigObj, tinyMceConfig.customConfig);
@@ -3277,13 +4923,16 @@ will override element type to textarea and add own attribute ngModel tied to jso
                             var unsubscribe = scope.$on('formSubmitting', function () {
                                 //TODO: Here we should parse out the macro rendered content so we can save on a lot of bytes in data xfer
                                 // we do parse it out on the server side but would be nice to do that on the client side before as well.
-                                scope.value = tinyMceEditor.getContent();
+                                scope.value = tinyMceEditor ? tinyMceEditor.getContent() : null;
                             });
                             //when the element is disposed we need to unsubscribe!
                             // NOTE: this is very important otherwise if this is part of a modal, the listener still exists because the dom
                             // element might still be there even after the modal has been hidden.
                             scope.$on('$destroy', function () {
                                 unsubscribe();
+                                if (tinyMceEditor !== undefined && tinyMceEditor != null) {
+                                    tinyMceEditor.destroy();
+                                }
                             });
                         });
                     });
@@ -3292,6 +4941,141 @@ will override element type to textarea and add own attribute ngModel tied to jso
             }
         };
     });
+    /** 
+@ngdoc directive
+@name umbraco.directives.directive:umbBox
+@restrict E
+
+@description
+Use this directive to render an already styled empty div tag.
+
+<h3>Markup example</h3>
+<pre>
+    <umb-box>
+        <umb-box-header title="this is a title"></umb-box-header>
+        <umb-box-content>
+            // Content here
+        </umb-box-content>
+    </umb-box>
+</pre>
+
+<h3>Use in combination with:</h3>
+<ul>
+    <li>{@link umbraco.directives.directive:umbBoxHeader umbBoxHeader}</li>
+    <li>{@link umbraco.directives.directive:umbBoxContent umbBoxContent}</li>
+</ul>
+**/
+    (function () {
+        'use strict';
+        function BoxDirective() {
+            var directive = {
+                restrict: 'E',
+                replace: true,
+                transclude: true,
+                templateUrl: 'views/components/html/umb-box/umb-box.html'
+            };
+            return directive;
+        }
+        angular.module('umbraco.directives').directive('umbBox', BoxDirective);
+    }());
+    /**
+@ngdoc directive
+@name umbraco.directives.directive:umbBoxContent
+@restrict E
+
+@description
+Use this directive to render an empty container. Recommended to use it inside an {@link umbraco.directives.directive:umbBox umbBox} directive. See documentation for {@link umbraco.directives.directive:umbBox umbBox}.
+
+<h3>Markup example</h3>
+<pre>
+    <umb-box>
+        <umb-box-header title="this is a title"></umb-box-header>
+        <umb-box-content>
+            // Content here
+        </umb-box-content>
+    </umb-box>
+</pre>
+
+<h3>Use in combination with:</h3>
+<ul>
+    <li>{@link umbraco.directives.directive:umbBox umbBox}</li>
+    <li>{@link umbraco.directives.directive:umbBoxHeader umbBoxHeader}</li>
+</ul>
+**/
+    (function () {
+        'use strict';
+        function BoxContentDirective() {
+            var directive = {
+                restrict: 'E',
+                replace: true,
+                transclude: true,
+                templateUrl: 'views/components/html/umb-box/umb-box-content.html'
+            };
+            return directive;
+        }
+        angular.module('umbraco.directives').directive('umbBoxContent', BoxContentDirective);
+    }());
+    /**
+@ngdoc directive
+@name umbraco.directives.directive:umbBoxHeader
+@restrict E
+@scope
+
+@description
+Use this directive to construct a title. Recommended to use it inside an {@link umbraco.directives.directive:umbBox umbBox} directive. See documentation for {@link umbraco.directives.directive:umbBox umbBox}.
+
+<h3>Markup example</h3>
+<pre>
+    <umb-box>
+        <umb-box-header title="This is a title" description="I can enter a description right here"></umb-box-header>
+        <umb-box-content>
+            // Content here
+        </umb-box-content>
+    </umb-box>
+</pre>
+
+<h3>Markup example with using titleKey</h3>
+<pre>
+    <umb-box>
+        // the title-key property needs an areaAlias_keyAlias from the language files
+        <umb-box-header title-key="areaAlias_keyAlias" description-key="areaAlias_keyAlias"></umb-box-header>
+        <umb-box-content>
+            // Content here
+        </umb-box-content>
+    </umb-box>
+</pre>
+{@link https://our.umbraco.org/documentation/extending/language-files/ Here you can see more about the language files}
+
+<h3>Use in combination with:</h3>
+<ul>
+    <li>{@link umbraco.directives.directive:umbBox umbBox}</li>
+    <li>{@link umbraco.directives.directive:umbBoxContent umbBoxContent}</li>
+</ul>
+
+@param {string=} title (<code>attrbute</code>): Custom title text.
+@param {string=} titleKey (<code>attrbute</code>): The translation key from the language xml files.
+@param {string=} description (<code>attrbute</code>): Custom description text.
+@param {string=} descriptionKey (<code>attrbute</code>): The translation key from the language xml files.
+**/
+    (function () {
+        'use strict';
+        function BoxHeaderDirective() {
+            var directive = {
+                restrict: 'E',
+                replace: true,
+                transclude: true,
+                templateUrl: 'views/components/html/umb-box/umb-box-header.html',
+                scope: {
+                    titleKey: '@?',
+                    title: '@?',
+                    descriptionKey: '@?',
+                    description: '@?'
+                }
+            };
+            return directive;
+        }
+        angular.module('umbraco.directives').directive('umbBoxHeader', BoxHeaderDirective);
+    }());
     /**
 * @ngdoc directive
 * @name umbraco.directives.directive:umbControlGroup
@@ -3303,7 +5087,9 @@ will override element type to textarea and add own attribute ngModel tied to jso
                 label: '@label',
                 description: '@',
                 hideLabel: '@',
-                alias: '@'
+                alias: '@',
+                labelFor: '@',
+                required: '@?'
             },
             require: '?^form',
             transclude: true,
@@ -3312,8 +5098,9 @@ will override element type to textarea and add own attribute ngModel tied to jso
             templateUrl: 'views/components/html/umb-control-group.html',
             link: function (scope, element, attr, formCtrl) {
                 scope.formValid = function () {
-                    if (formCtrl) {
-                        return formCtrl.$valid;
+                    if (formCtrl && scope.labelFor) {
+                        //if a label-for has been set, use that for the validation
+                        return formCtrl[scope.labelFor].$valid;
                     }
                     //there is no form.
                     return true;
@@ -3833,6 +5620,61 @@ will override element type to textarea and add own attribute ngModel tied to jso
             }
         };
     });
+    (function () {
+        'use strict';
+        function MediaNodeInfoDirective($timeout, $location, eventsService, userService, dateHelper) {
+            function link(scope, element, attrs, ctrl) {
+                var evts = [];
+                function onInit() {
+                    scope.allowOpenMediaType = true;
+                    // get document type details
+                    scope.mediaType = scope.node.contentType;
+                    // get node url
+                    scope.nodeUrl = scope.node.mediaLink;
+                    // make sure dates are formatted to the user's locale
+                    formatDatesToLocal();
+                }
+                function formatDatesToLocal() {
+                    // get current backoffice user and format dates
+                    userService.getCurrentUser().then(function (currentUser) {
+                        scope.node.createDateFormatted = dateHelper.getLocalDate(scope.node.createDate, currentUser.locale, 'LLL');
+                        scope.node.updateDateFormatted = dateHelper.getLocalDate(scope.node.updateDate, currentUser.locale, 'LLL');
+                    });
+                }
+                scope.openMediaType = function (mediaType) {
+                    // remove first "#" from url if it is prefixed else the path won't work
+                    var url = '/settings/mediaTypes/edit/' + mediaType.id;
+                    $location.path(url);
+                };
+                // watch for content updates - reload content when node is saved, published etc.
+                scope.$watch('node.updateDate', function (newValue, oldValue) {
+                    if (!newValue) {
+                        return;
+                    }
+                    if (newValue === oldValue) {
+                        return;
+                    }
+                    formatDatesToLocal();
+                });
+                //ensure to unregister from all events!
+                scope.$on('$destroy', function () {
+                    for (var e in evts) {
+                        eventsService.unsubscribe(evts[e]);
+                    }
+                });
+                onInit();
+            }
+            var directive = {
+                restrict: 'E',
+                replace: true,
+                templateUrl: 'views/components/media/umb-media-node-info.html',
+                scope: { node: '=' },
+                link: link
+            };
+            return directive;
+        }
+        angular.module('umbraco.directives').directive('umbMediaNodeInfo', MediaNodeInfoDirective);
+    }());
     /**
  * @ngdoc directive
  * @name umbraco.directives.directive:umbNotifications
@@ -3920,7 +5762,6 @@ will override element type to textarea and add own attribute ngModel tied to jso
 </pre>
 
 <h1>General Options</h1>
-Lorem ipsum dolor sit amet..
 <table>
     <thead>
         <tr>
@@ -3935,7 +5776,7 @@ Lorem ipsum dolor sit amet..
         <td>Set the title of the overlay.</td>
     </tr>
     <tr>
-        <td>model.subTitle</td>
+        <td>model.subtitle</td>
         <td>String</td>
         <td>Set the subtitle of the overlay.</td>
     </tr>
@@ -4325,10 +6166,12 @@ Opens an overlay to show a custom YSOD. </br>
                                     'BUTTON'
                                 ];
                                 var submitOnEnter = document.activeElement.hasAttribute('overlay-submit-on-enter');
+                                var submitOnEnterValue = submitOnEnter ? document.activeElement.getAttribute('overlay-submit-on-enter') : '';
                                 if (clickableElements.indexOf(activeElementType) === 0) {
                                     document.activeElement.click();
                                     event.preventDefault();
                                 } else if (activeElementType === 'TEXTAREA' && !submitOnEnter) {
+                                } else if (submitOnEnter && submitOnEnterValue === 'false') {
                                 } else {
                                     scope.$apply(function () {
                                         scope.submitForm(scope.model);
@@ -4505,7 +6348,7 @@ Opens an overlay to show a custom YSOD. </br>
 * @name umbraco.directives.directive:umbProperty
 * @restrict E
 **/
-    angular.module('umbraco.directives').directive('umbProperty', function (umbPropEditorHelper) {
+    angular.module('umbraco.directives').directive('umbProperty', function (umbPropEditorHelper, userService) {
         return {
             scope: { property: '=' },
             transclude: true,
@@ -4513,7 +6356,10 @@ Opens an overlay to show a custom YSOD. </br>
             replace: true,
             templateUrl: 'views/components/property/umb-property.html',
             link: function (scope) {
-                scope.propertyAlias = Umbraco.Sys.ServerVariables.isDebuggingEnabled === true ? scope.property.alias : null;
+                userService.getCurrentUser().then(function (u) {
+                    var isAdmin = u.userGroups.indexOf('admin') !== -1;
+                    scope.propertyAlias = Umbraco.Sys.ServerVariables.isDebuggingEnabled === true || isAdmin ? scope.property.alias : null;
+                });
             },
             //Define a controller for this directive to expose APIs to other directives
             controller: function ($scope, $timeout) {
@@ -4592,7 +6438,7 @@ Opens an overlay to show a custom YSOD. </br>
     angular.module('umbraco.directives').directive('umbTabs', function () {
         return {
             restrict: 'A',
-            controller: function ($scope, $element, $attrs) {
+            controller: function ($scope, $element, $attrs, eventsService) {
                 var callbacks = [];
                 this.onTabShown = function (cb) {
                     callbacks.push(cb);
@@ -4602,6 +6448,13 @@ Opens an overlay to show a custom YSOD. </br>
                     // active tab
                     var prev = $(event.relatedTarget);
                     // previous tab
+                    // emit tab change event
+                    var tabId = Number(curr.context.hash.replace('#tab', ''));
+                    var args = {
+                        id: tabId,
+                        hash: curr.context.hash
+                    };
+                    eventsService.emit('app.tabChange', args);
                     $scope.$apply();
                     for (var c in callbacks) {
                         callbacks[c].apply(this, [{
@@ -4709,7 +6562,7 @@ Opens an overlay to show a custom YSOD. </br>
                 //var showheader = (attrs.showheader !== 'false');
                 var hideoptions = attrs.hideoptions === 'true' ? 'hide-options' : '';
                 var template = '<ul class="umb-tree ' + hideoptions + '"><li class="root">';
-                template += '<div ng-hide="hideheader" on-right-click="altSelect(tree.root, $event)">' + '<h5>' + '<a href="#/{{section}}" ng-click="select(tree.root, $event)"  class="root-link"><i ng-if="enablecheckboxes == \'true\'" ng-class="selectEnabledNodeClass(tree.root)"></i> {{tree.name}}</a></h5>' + '<a class="umb-options" ng-hide="tree.root.isContainer || !tree.root.menuUrl" ng-click="options(tree.root, $event)" ng-swipe-right="options(tree.root, $event)"><i></i><i></i><i></i></a>' + '</div>';
+                template += '<div data-element="tree-root" ng-class="getNodeCssClass(tree.root)" ng-hide="hideheader" on-right-click="altSelect(tree.root, $event)">' + '<h5>' + '<a href="#/{{section}}" ng-click="select(tree.root, $event)"  class="root-link"><i ng-if="enablecheckboxes == \'true\'" ng-class="selectEnabledNodeClass(tree.root)"></i> {{tree.name}}</a></h5>' + '<a data-element="tree-item-options" class="umb-options" ng-hide="tree.root.isContainer || !tree.root.menuUrl" ng-click="options(tree.root, $event)" ng-swipe-right="options(tree.root, $event)"><i></i><i></i><i></i></a>' + '</div>';
                 template += '<ul>' + '<umb-tree-item ng-repeat="child in tree.root.children" enablelistviewexpand="{{enablelistviewexpand}}" eventhandler="eventhandler" node="child" current-node="currentNode" tree="this" section="{{section}}" ng-animate="animation()"></umb-tree-item>' + '</ul>' + '</li>' + '</ul>';
                 element.replaceWith(template);
                 return function (scope, elem, attr, controller) {
@@ -4794,10 +6647,13 @@ Opens an overlay to show a custom YSOD. </br>
                                 // and previous so that the tree syncs properly. The tree syncs from the top down and if there are parts
                                 // of the tree's path in there that don't actually exist in the dom/model then syncing will not work.
                                 userService.getCurrentUser().then(function (userData) {
-                                    var startNodes = [
-                                        userData.startContentId,
-                                        userData.startMediaId
-                                    ];
+                                    var startNodes = [];
+                                    for (var i = 0; i < userData.startContentIds; i++) {
+                                        startNodes.push(userData.startContentIds[i]);
+                                    }
+                                    for (var j = 0; j < userData.startMediaIds; j++) {
+                                        startNodes.push(userData.startMediaIds[j]);
+                                    }
                                     _.each(startNodes, function (i) {
                                         var found = _.find(args.path, function (p) {
                                             return String(p) === String(i);
@@ -4925,6 +6781,21 @@ Opens an overlay to show a custom YSOD. </br>
                             enableDeleteAnimations();
                         });
                     }
+                    /** Returns the css classses assigned to the node (div element) */
+                    scope.getNodeCssClass = function (node) {
+                        if (!node) {
+                            return '';
+                        }
+                        //TODO: This is called constantly because as a method in a template it's re-evaluated pretty much all the time
+                        // it would be better if we could cache the processing. The problem is that some of these things are dynamic.
+                        var css = [];
+                        if (node.cssClasses) {
+                            _.each(node.cssClasses, function (c) {
+                                css.push(c);
+                            });
+                        }
+                        return css.join(' ');
+                    };
                     scope.selectEnabledNodeClass = function (node) {
                         return node ? node.selected ? 'icon umb-tree-icon sprTree icon-check green temporary' : '' : '';
                     };
@@ -4997,6 +6868,10 @@ Opens an overlay to show a custom YSOD. </br>
                   defined on the tree
                 */
                     scope.select = function (n, ev) {
+                        if (n.metaData && n.metaData.noAccess === true) {
+                            ev.preventDefault();
+                            return;
+                        }
                         //on tree select we need to remove the current node -
                         // whoever handles this will need to make sure the correct node is selected
                         //reset current node selection
@@ -5072,10 +6947,10 @@ Opens an overlay to show a custom YSOD. </br>
             },
             //TODO: Remove more of the binding from this template and move the DOM manipulation to be manually done in the link function,
             // this will greatly improve performance since there's potentially a lot of nodes being rendered = a LOT of watches!
-            template: '<li ng-class="{\'current\': (node == currentNode), \'has-children\': node.hasChildren}" on-right-click="altSelect(node, $event)">' + '<div ng-class="getNodeCssClass(node)" ng-swipe-right="options(node, $event)" >' + //NOTE: This ins element is used to display the search icon if the node is a container/listview and the tree is currently in dialog
+            template: '<li data-element="tree-item-{{node.dataElement}}" ng-class="{\'current\': (node == currentNode), \'has-children\': node.hasChildren}" on-right-click="altSelect(node, $event)">' + '<div ng-class="getNodeCssClass(node)" ng-swipe-right="options(node, $event)" ng-dblclick="load(node)" >' + //NOTE: This ins element is used to display the search icon if the node is a container/listview and the tree is currently in dialog
             //'<ins ng-if="tree.enablelistviewsearch && node.metaData.isContainer" class="umb-tree-node-search icon-search" ng-click="searchNode(node, $event)" alt="searchAltText"></ins>' + 
-            '<ins ng-class="{\'icon-navigation-right\': !node.expanded || node.metaData.isContainer, \'icon-navigation-down\': node.expanded && !node.metaData.isContainer}" ng-click="load(node)">&nbsp;</ins>' + '<i class="icon umb-tree-icon sprTree" ng-click="select(node, $event)"></i>' + '<a href="#/{{node.routePath}}" ng-click="select(node, $event)"></a>' + //NOTE: These are the 'option' elipses
-            '<a class="umb-options" ng-click="options(node, $event)"><i></i><i></i><i></i></a>' + '<div ng-show="node.loading" class="l"><div></div></div>' + '</div>' + '</li>',
+            '<ins data-element="tree-item-expand" ng-class="{\'icon-navigation-right\': !node.expanded || node.metaData.isContainer, \'icon-navigation-down\': node.expanded && !node.metaData.isContainer}" ng-click="load(node)">&nbsp;</ins>' + '<i class="icon umb-tree-icon sprTree" ng-click="select(node, $event)"></i>' + '<a class="umb-tree-item__label" href="#/{{node.routePath}}" ng-click="select(node, $event)"></a>' + //NOTE: These are the 'option' elipses
+            '<a data-element="tree-item-options" class="umb-options" ng-click="options(node, $event)"><i></i><i></i><i></i></a>' + '<div ng-show="node.loading" class="l"><div></div></div>' + '</div>' + '</li>',
             link: function (scope, element, attrs) {
                 localizationService.localize('general_search').then(function (value) {
                     scope.searchAltText = value;
@@ -5110,6 +6985,12 @@ Opens an overlay to show a custom YSOD. </br>
                     if (node.style) {
                         element.find('i:first').attr('style', node.style);
                     }
+                    // add a unique data element to each tree item so it is easy to navigate with code
+                    if (!node.metaData.treeAlias) {
+                        node.dataElement = node.name;
+                    } else {
+                        node.dataElement = node.metaData.treeAlias;
+                    }
                 }
                 //This will deleteAnimations to true after the current digest
                 function enableDeleteAnimations() {
@@ -5124,6 +7005,8 @@ Opens an overlay to show a custom YSOD. </br>
                     if (!node) {
                         return '';
                     }
+                    //TODO: This is called constantly because as a method in a template it's re-evaluated pretty much all the time
+                    // it would be better if we could cache the processing. The problem is that some of these things are dynamic.
                     var css = [];
                     if (node.cssClasses) {
                         _.each(node.cssClasses, function (c) {
@@ -5166,6 +7049,10 @@ Opens an overlay to show a custom YSOD. </br>
                 scope.select = function (n, ev) {
                     if (ev.ctrlKey || ev.shiftKey || ev.metaKey || ev.button && ev.button === 1    // middle click, >IE9 + everyone else
 ) {
+                        return;
+                    }
+                    if (n.metaData && n.metaData.noAccess === true) {
+                        ev.preventDefault();
                         return;
                     }
                     emitEvent('treeNodeSelect', {
@@ -5255,6 +7142,11 @@ Opens an overlay to show a custom YSOD. </br>
                 };
                 //if the current path contains the node id, we will auto-expand the tree item children
                 setupNodeDom(scope.node, scope.tree);
+                // load the children if the current user don't have access to the node
+                // it is used to auto expand the tree to the start nodes the user has access to
+                if (scope.node.hasChildren && scope.node.metaData.noAccess) {
+                    scope.loadChildren(scope.node);
+                }
                 var template = '<ul ng-class="{collapsed: !node.expanded}"><umb-tree-item  ng-repeat="child in node.children" enablelistviewexpand="{{enablelistviewexpand}}" eventhandler="eventhandler" tree="tree" current-node="currentNode" node="child" section="{{section}}" ng-animate="animation()"></umb-tree-item></ul>';
                 var newElement = angular.element(template);
                 $compile(newElement)(scope);
@@ -5482,7 +7374,7 @@ Opens an overlay to show a custom YSOD. </br>
                 assetsService.load([
                     'lib/ace-builds/src-min-noconflict/ace.js',
                     'lib/ace-builds/src-min-noconflict/ext-language_tools.js'
-                ]).then(function () {
+                ], scope).then(function () {
                     if (angular.isUndefined(window.ace)) {
                         throw new Error('ui-ace need ace to work... (o rly?)');
                     } else {
@@ -5713,19 +7605,87 @@ Use this directive to render an avatar.
     (function () {
         'use strict';
         function AvatarDirective() {
+            function link(scope, element, attrs, ctrl) {
+                var eventBindings = [];
+                scope.initials = '';
+                function onInit() {
+                    if (!scope.unknownChar) {
+                        scope.unknownChar = '?';
+                    }
+                    scope.initials = getNameInitials(scope.name);
+                }
+                function getNameInitials(name) {
+                    if (name) {
+                        var names = name.split(' '), initials = names[0].substring(0, 1);
+                        if (names.length > 1) {
+                            initials += names[names.length - 1].substring(0, 1);
+                        }
+                        return initials.toUpperCase();
+                    }
+                    return null;
+                }
+                eventBindings.push(scope.$watch('name', function (newValue, oldValue) {
+                    if (newValue === oldValue) {
+                        return;
+                    }
+                    if (oldValue === undefined || newValue === undefined) {
+                        return;
+                    }
+                    scope.initials = getNameInitials(newValue);
+                }));
+                onInit();
+            }
             var directive = {
                 restrict: 'E',
                 replace: true,
                 templateUrl: 'views/components/umb-avatar.html',
                 scope: {
                     size: '@',
+                    name: '@',
+                    color: '@',
                     imgSrc: '@',
-                    imgSrcset: '@'
-                }
+                    imgSrcset: '@',
+                    unknownChar: '@'
+                },
+                link: link
             };
             return directive;
         }
         angular.module('umbraco.directives').directive('umbAvatar', AvatarDirective);
+    }());
+    (function () {
+        'use strict';
+        function BadgeDirective() {
+            var directive = {
+                restrict: 'E',
+                replace: true,
+                transclude: true,
+                templateUrl: 'views/components/umb-badge.html',
+                scope: {
+                    size: '@?',
+                    color: '@?'
+                }
+            };
+            return directive;
+        }
+        angular.module('umbraco.directives').directive('umbBadge', BadgeDirective);
+    }());
+    (function () {
+        'use strict';
+        function CheckmarkDirective() {
+            var directive = {
+                restrict: 'E',
+                replace: true,
+                transclude: true,
+                templateUrl: 'views/components/umb-checkmark.html',
+                scope: {
+                    size: '@?',
+                    checked: '='
+                }
+            };
+            return directive;
+        }
+        angular.module('umbraco.directives').directive('umbCheckmark', CheckmarkDirective);
     }());
     /**
 @ngdoc directive
@@ -5929,6 +7889,152 @@ Use this directive to render a ui component for selecting child items to a paren
             return directive;
         }
         angular.module('umbraco.directives').directive('umbChildSelector', ChildSelectorDirective);
+    }());
+    /**
+@ngdoc directive
+@name umbraco.directives.directive:umbClipboard
+@restrict E
+@scope
+
+@description
+<strong>Added in Umbraco v. 7.7:</strong> Use this directive to copy content to the clipboard
+
+<h3>Markup example</h3>
+<pre>
+    <div ng-controller="My.ClipBoardController as vm">
+        
+        <!-- Copy text from an element -->
+        <div id="copy-text">Copy me!</div>
+        
+        <umb-button
+            umb-clipboard
+            umb-clipboard-success="vm.copySuccess()"
+            umb-clipboard-error="vm.copyError()"
+            umb-clipboard-target="#copy-text"
+            state="vm.clipboardButtonState"
+            type="button"
+            label="Copy">
+        </umb-button>
+
+        <!-- Cut text from a textarea -->
+        <textarea id="cut-text" ng-model="vm.cutText"></textarea>
+
+        <umb-button
+            umb-clipboard
+            umb-clipboard-success="vm.copySuccess()"
+            umb-clipboard-error="vm.copyError()"
+            umb-clipboard-target="#cut-text"
+            umb-clipboard-action="cut"
+            state="vm.clipboardButtonState"
+            type="button"
+            label="Copy">
+        </umb-button>
+
+        <!-- Copy text without an element -->
+        <umb-button
+            ng-if="vm.copyText"
+            umb-clipboard
+            umb-clipboard-success="vm.copySuccess()"
+            umb-clipboard-error="vm.copyError()"
+            umb-clipboard-text="vm.copyText"
+            state="vm.clipboardButtonState"
+            type="button"
+            label="Copy">
+        </umb-button>
+    
+    </div>
+</pre>
+
+<h3>Controller example</h3>
+<pre>
+    (function () {
+        "use strict";
+
+        function Controller() {
+
+            var vm = this;
+
+            vm.copyText = "Copy text without element";
+            vm.cutText = "Text to cut";
+
+            vm.copySuccess = copySuccess;
+            vm.copyError = copyError;
+
+            function copySuccess() {
+                vm.clipboardButtonState = "success";
+            }
+            
+            function copyError() {
+                vm.clipboardButtonState = "error";
+            }
+
+        }
+
+        angular.module("umbraco").controller("My.ClipBoardController", Controller);
+
+    })();
+</pre>
+
+@param {callback} umbClipboardSuccess (<code>expression</code>): Callback function when the content is copied.
+@param {callback} umbClipboardError (<code>expression</code>): Callback function if the copy fails.
+@param {string} umbClipboardTarget (<code>attribute</code>): The target element to copy.
+@param {string} umbClipboardAction (<code>attribute</code>): Specify if you want to copy or cut content ("copy", "cut"). Cut only works on <code>input</code> and <code>textarea</code> elements.
+@param {string} umbClipboardText (<code>attribute</code>): Use this attribute if you don't have an element to copy from.
+
+**/
+    (function () {
+        'use strict';
+        function umbClipboardDirective($timeout, assetsService) {
+            function link(scope, element, attrs, ctrl) {
+                var clipboard;
+                var target = element[0];
+                assetsService.loadJs('lib/clipboard/clipboard.min.js', scope).then(function () {
+                    if (scope.umbClipboardTarget) {
+                        target.setAttribute('data-clipboard-target', scope.umbClipboardTarget);
+                    }
+                    if (scope.umbClipboardAction) {
+                        target.setAttribute('data-clipboard-action', scope.umbClipboardAction);
+                    }
+                    if (scope.umbClipboardText) {
+                        target.setAttribute('data-clipboard-text', scope.umbClipboardText);
+                    }
+                    clipboard = new Clipboard(target);
+                    clipboard.on('success', function (e) {
+                        e.clearSelection();
+                        if (scope.umbClipboardSuccess) {
+                            scope.$apply(function () {
+                                scope.umbClipboardSuccess({ e: e });
+                            });
+                        }
+                    });
+                    clipboard.on('error', function (e) {
+                        if (scope.umbClipboardError) {
+                            scope.$apply(function () {
+                                scope.umbClipboardError({ e: e });
+                            });
+                        }
+                    });
+                });
+                // clean up
+                scope.$on('$destroy', function () {
+                    clipboard.destroy();
+                });
+            }
+            ////////////
+            var directive = {
+                restrict: 'A',
+                scope: {
+                    umbClipboardSuccess: '&?',
+                    umbClipboardError: '&?',
+                    umbClipboardTarget: '@?',
+                    umbClipboardAction: '@?',
+                    umbClipboardText: '=?'
+                },
+                link: link
+            };
+            return directive;
+        }
+        angular.module('umbraco.directives').directive('umbClipboard', umbClipboardDirective);
     }());
     /**
  * @ngdoc directive
@@ -6268,11 +8374,14 @@ Use this directive to render a date time picker
         'use strict';
         function DateTimePickerDirective(assetsService) {
             function link(scope, element, attrs, ctrl) {
+                scope.hasTranscludedContent = false;
                 function onInit() {
+                    // check for transcluded content so we can hide the defualt markup
+                    scope.hasTranscludedContent = element.find('.js-datePicker__transcluded-content')[0].children.length > 0;
                     // load css file for the date picker
-                    assetsService.loadCss('lib/datetimepicker/bootstrap-datetimepicker.min.css');
+                    assetsService.loadCss('lib/datetimepicker/bootstrap-datetimepicker.min.css', scope);
                     // load the js file for the date picker
-                    assetsService.loadJs('lib/datetimepicker/bootstrap-datetimepicker.js').then(function () {
+                    assetsService.loadJs('lib/datetimepicker/bootstrap-datetimepicker.js', scope).then(function () {
                         // init date picker
                         initDatePicker();
                     });
@@ -6326,6 +8435,7 @@ Use this directive to render a date time picker
             var directive = {
                 restrict: 'E',
                 replace: true,
+                transclude: true,
                 templateUrl: 'views/components/umb-date-time-picker.html',
                 scope: {
                     options: '=',
@@ -6356,6 +8466,145 @@ Use this directive to render a date time picker
             return directive;
         }
         angular.module('umbraco.directives').directive('umbDisableFormValidation', UmbDisableFormValidation);
+    }());
+    /**
+@ngdoc directive
+@name umbraco.directives.directive:umbDropdown
+@restrict E
+@scope
+
+@description
+<b>Added in versions 7.7.0</b>: Use this component to render a dropdown menu.
+
+<h3>Markup example</h3>
+<pre>
+    <div ng-controller="MyDropdown.Controller as vm">
+
+        <div style="position: relative;">
+
+            <umb-button
+                type="button"
+                label="Toggle dropdown"
+                action="vm.toggle()">
+            </umb-button>
+
+            <umb-dropdown ng-if="vm.dropdownOpen" on-close="vm.close()" umb-keyboard-list>
+                <umb-dropdown-item
+                    ng-repeat="item in vm.items">
+                    <a href="" ng-click="vm.select(item)">{{ item.name }}</a>
+                </umb-dropdown-item>
+            </umb-dropdown>
+
+        </div>
+
+    </div>
+</pre>
+
+<h3>Controller example</h3>
+<pre>
+    (function () {
+        "use strict";
+
+        function Controller() {
+
+            var vm = this;
+
+            vm.dropdownOpen = false;
+            vm.items = [
+                { "name": "Item 1" },
+                { "name": "Item 2" },
+                { "name": "Item 3" }
+            ];
+
+            vm.toggle = toggle;
+            vm.close = close;
+            vm.select = select;
+
+            function toggle() {
+                vm.dropdownOpen = true;
+            }
+
+            function close() {
+                vm.dropdownOpen = false;
+            }
+
+            function select(item) {
+                // Do your magic here
+            }
+
+        }
+
+        angular.module("umbraco").controller("MyDropdown.Controller", Controller);
+    })();
+</pre>
+
+<h3>Use in combination with</h3>
+<ul>
+    <li>{@link umbraco.directives.directive:umbDropdownItem umbDropdownItem}</li>
+    <li>{@link umbraco.directives.directive:umbKeyboardList umbKeyboardList}</li>
+</ul>
+
+@param {callback} onClose Callback when the dropdown menu closes. When you click outside or press esc.
+
+**/
+    (function () {
+        'use strict';
+        function umbDropdown($document) {
+            function link(scope, element, attr, ctrl) {
+                scope.close = function () {
+                    if (scope.onClose) {
+                        scope.onClose();
+                    }
+                };
+                // Handle keydown events
+                function keydown(event) {
+                    // press escape
+                    if (event.keyCode === 27) {
+                        scope.onClose();
+                    }
+                }
+                // Stop to listen typing.
+                function stopListening() {
+                    $document.off('keydown', keydown);
+                }
+                // Start listening to key typing.
+                $document.on('keydown', keydown);
+                // Stop listening when scope is destroyed.
+                scope.$on('$destroy', stopListening);
+            }
+            var directive = {
+                restrict: 'E',
+                replace: true,
+                transclude: true,
+                templateUrl: 'views/components/umb-dropdown.html',
+                scope: { onClose: '&' },
+                link: link
+            };
+            return directive;
+        }
+        angular.module('umbraco.directives').directive('umbDropdown', umbDropdown);
+    }());
+    /**
+@ngdoc directive
+@name umbraco.directives.directive:umbDropdownItem
+@restrict E
+
+@description
+<b>Added in versions 7.7.0</b>: Use this directive to construct a dropdown item. See documentation for {@link umbraco.directives.directive:umbDropdown umbDropdown}.
+
+**/
+    (function () {
+        'use strict';
+        function umbDropdownItem() {
+            var directive = {
+                restrict: 'E',
+                replace: true,
+                transclude: true,
+                templateUrl: 'views/components/umb-dropdown-item.html'
+            };
+            return directive;
+        }
+        angular.module('umbraco.directives').directive('umbDropdownItem', umbDropdownItem);
     }());
     /**
 @ngdoc directive
@@ -7106,7 +9355,7 @@ the directive will use {@link umbraco.directives.directive:umbLockedField umbLoc
                     scope.editPropertyTypeSettings(property, group);
                 };
                 scope.editPropertyTypeSettings = function (property, group) {
-                    if (!property.inherited && !property.locked) {
+                    if (!property.inherited) {
                         scope.propertySettingsDialogModel = {};
                         scope.propertySettingsDialogModel.title = 'Property settings';
                         scope.propertySettingsDialogModel.property = property;
@@ -7151,6 +9400,7 @@ the directive will use {@link umbraco.directives.directive:umbLockedField umbLoc
                             property.validation.pattern = oldModel.property.validation.pattern;
                             property.showOnMemberProfile = oldModel.property.showOnMemberProfile;
                             property.memberCanEdit = oldModel.property.memberCanEdit;
+                            property.isSensitiveValue = oldModel.property.isSensitiveValue;
                             // because we set state to active, to show a preview, we have to check if has been filled out
                             // label is required so if it is not filled we know it is a placeholder
                             if (oldModel.property.editor === undefined || oldModel.property.editor === null || oldModel.property.editor === '') {
@@ -7989,7 +10239,7 @@ Use this directive to generate a thumbnail grid of media items.
                     if (scope.itemMinWidth) {
                         itemMinWidth = scope.itemMinWidth;
                     }
-                    if (scope.itemMinWidth) {
+                    if (scope.itemMinHeight) {
                         itemMinHeight = scope.itemMinHeight;
                     }
                     for (var i = 0; scope.items.length > i; i++) {
@@ -8323,6 +10573,84 @@ Use this directive to generate a thumbnail grid of media items.
         }
         angular.module('umbraco.directives').directive('umbMiniListView', MiniListViewDirective);
     }());
+    angular.module('umbraco.directives').directive('umbNestedContentEditor', [function () {
+            var link = function ($scope) {
+                // Clone the model because some property editors
+                // do weird things like updating and config values
+                // so we want to ensure we start from a fresh every
+                // time, we'll just sync the value back when we need to
+                $scope.model = angular.copy($scope.ngModel);
+                $scope.nodeContext = $scope.model;
+                // Find the selected tab
+                var selectedTab = $scope.model.tabs[0];
+                if ($scope.tabAlias) {
+                    angular.forEach($scope.model.tabs, function (tab) {
+                        if (tab.alias.toLowerCase() === $scope.tabAlias.toLowerCase()) {
+                            selectedTab = tab;
+                            return;
+                        }
+                    });
+                }
+                $scope.tab = selectedTab;
+                // Listen for sync request
+                var unsubscribe = $scope.$on('ncSyncVal', function (ev, args) {
+                    if (args.key === $scope.model.key) {
+                        // Tell inner controls we are submitting
+                        $scope.$broadcast('formSubmitting', { scope: $scope });
+                        // Sync the values back
+                        angular.forEach($scope.ngModel.tabs, function (tab) {
+                            if (tab.alias.toLowerCase() === selectedTab.alias.toLowerCase()) {
+                                var localPropsMap = selectedTab.properties.reduce(function (map, obj) {
+                                    map[obj.alias] = obj;
+                                    return map;
+                                }, {});
+                                angular.forEach(tab.properties, function (prop) {
+                                    if (localPropsMap.hasOwnProperty(prop.alias)) {
+                                        prop.value = localPropsMap[prop.alias].value;
+                                    }
+                                });
+                            }
+                        });
+                    }
+                });
+                $scope.$on('$destroy', function () {
+                    unsubscribe();
+                });
+            };
+            return {
+                restrict: 'E',
+                replace: true,
+                templateUrl: Umbraco.Sys.ServerVariables.umbracoSettings.umbracoPath + '/views/propertyeditors/nestedcontent/nestedcontent.editor.html',
+                scope: {
+                    ngModel: '=',
+                    tabAlias: '='
+                },
+                link: link
+            };
+        }]);
+    //angular.module("umbraco.directives").directive('nestedContentSubmitWatcher', function () {
+    //    var link = function (scope) {
+    //        // call the load callback on scope to obtain the ID of this submit watcher
+    //        var id = scope.loadCallback();
+    //        scope.$on("formSubmitting", function (ev, args) {
+    //            // on the "formSubmitting" event, call the submit callback on scope to notify the nestedContent controller to do it's magic
+    //            if (id === scope.activeSubmitWatcher) {
+    //                scope.submitCallback();
+    //            }
+    //        });
+    //    }
+    //    return {
+    //        restrict: "E",
+    //        replace: true,
+    //        template: "",
+    //        scope: {
+    //            loadCallback: '=',
+    //            submitCallback: '=',
+    //            activeSubmitWatcher: '='
+    //        },
+    //        link: link
+    //    }
+    //});
     /**
 @ngdoc directive
 @name umbraco.directives.directive:umbNodePreview
@@ -8402,18 +10730,23 @@ Use this directive to generate a thumbnail grid of media items.
 
 @param {string} icon (<code>binding</code>): The node icon.
 @param {string} name (<code>binding</code>): The node name.
-@param {boolean} published (<code>binding</code>): The node pusblished state.
+@param {boolean} published (<code>binding</code>): The node published state.
 @param {string} description (<code>binding</code>): A short description.
 @param {boolean} sortable (<code>binding</code>): Will add a move cursor on the node preview. Can used in combination with ui-sortable.
 @param {boolean} allowRemove (<code>binding</code>): Show/Hide the remove button.
 @param {boolean} allowOpen (<code>binding</code>): Show/Hide the open button.
+@param {boolean} allowEdit (<code>binding</code>): Show/Hide the edit button (Added in version 7.7.0).
 @param {function} onRemove (<code>expression</code>): Callback function when the remove button is clicked.
 @param {function} onOpen (<code>expression</code>): Callback function when the open button is clicked.
+@param {function} onEdit (<code>expression</code>): Callback function when the edit button is clicked (Added in version 7.7.0).
 **/
     (function () {
         'use strict';
         function NodePreviewDirective() {
             function link(scope, el, attr, ctrl) {
+                if (!scope.editLabelKey) {
+                    scope.editLabelKey = 'general_edit';
+                }
             }
             var directive = {
                 restrict: 'E',
@@ -8423,12 +10756,15 @@ Use this directive to generate a thumbnail grid of media items.
                     icon: '=?',
                     name: '=',
                     description: '=?',
+                    permissions: '=?',
                     published: '=?',
                     sortable: '=?',
                     allowOpen: '=?',
                     allowRemove: '=?',
+                    allowEdit: '=?',
                     onOpen: '&?',
-                    onRemove: '&?'
+                    onRemove: '&?',
+                    onEdit: '&?'
                 },
                 link: link
             };
@@ -8633,6 +10969,37 @@ Use this directive to generate a pagination.
     }());
     /**
 @ngdoc directive
+@name umbraco.directives.directive:umbPasswordToggle
+@restrict E
+@scope
+
+@description
+<strong>Added in Umbraco v. 7.7.4:</strong> Use this directive to render a password toggle.
+
+**/
+    (function () {
+        'use strict';
+        // comes from https://codepen.io/jakob-e/pen/eNBQaP
+        // works fine with Angular 1.6.5 - alas not with 1.1.5 - binding issue
+        function PasswordToggleDirective($compile) {
+            var directive = {
+                restrict: 'A',
+                scope: {},
+                link: function (scope, elem, attrs) {
+                    scope.tgl = function () {
+                        elem.attr('type', elem.attr('type') === 'text' ? 'password' : 'text');
+                    };
+                    var lnk = angular.element('<a data-ng-click="tgl()">Toggle</a>');
+                    $compile(lnk)(scope);
+                    elem.wrap('<div class="password-toggle"/>').after(lnk);
+                }
+            };
+            return directive;
+        }
+        angular.module('umbraco.directives').directive('umbPasswordToggle', PasswordToggleDirective);
+    }());
+    /**
+@ngdoc directive
 @name umbraco.directives.directive:umbProgressBar
 @restrict E
 @scope
@@ -8648,6 +11015,8 @@ Use this directive to generate a progress bar.
 </pre>
 
 @param {number} percentage (<code>attribute</code>): The progress in percentage.
+@param {string} size (<code>attribute</code>): The size (s, m).
+
 **/
     (function () {
         'use strict';
@@ -8656,11 +11025,82 @@ Use this directive to generate a progress bar.
                 restrict: 'E',
                 replace: true,
                 templateUrl: 'views/components/umb-progress-bar.html',
-                scope: { percentage: '@' }
+                scope: {
+                    percentage: '@',
+                    size: '@?'
+                }
             };
             return directive;
         }
         angular.module('umbraco.directives').directive('umbProgressBar', ProgressBarDirective);
+    }());
+    /**
+@ngdoc directive
+@name umbraco.directives.directive:umbProgressCircle
+@restrict E
+@scope
+
+@description
+Use this directive to render a circular progressbar.
+
+<h3>Markup example</h3>
+<pre>
+    <div>
+    
+        <umb-progress-circle
+            percentage="80"
+            size="60"
+            color="secondary">
+        </umb-progress-circle>
+
+	</div>
+</pre>
+
+@param {string} size (<code>attribute</code>): This parameter defines the width and the height of the circle in pixels.
+@param {string} percentage (<code>attribute</code>): Takes a number between 0 and 100 and applies it to the circle's highlight length.
+@param {string} color (<code>attribute</code>): the color of the highlight (primary, secondary, success, warning, danger). Success by default. 
+**/
+    (function () {
+        'use strict';
+        function ProgressCircleDirective($http, $timeout) {
+            function link(scope, element, $filter) {
+                function onInit() {
+                    // making sure we get the right numbers
+                    var percent = scope.percentage;
+                    if (percent > 100) {
+                        percent = 100;
+                    } else if (percent < 0) {
+                        percent = 0;
+                    }
+                    // calculating the circle's highlight
+                    var circle = element.find('.umb-progress-circle__highlight');
+                    var r = circle.attr('r');
+                    var strokeDashArray = r * Math.PI * 2;
+                    // Full circle length
+                    scope.strokeDashArray = strokeDashArray;
+                    var strokeDashOffsetDifference = percent / 100 * strokeDashArray;
+                    var strokeDashOffset = strokeDashArray - strokeDashOffsetDifference;
+                    // Distance for the highlight dash's offset
+                    scope.strokeDashOffset = strokeDashOffset;
+                    // set font size
+                    scope.percentageSize = scope.size * 0.3 + 'px';
+                }
+                onInit();
+            }
+            var directive = {
+                restrict: 'E',
+                replace: true,
+                templateUrl: 'views/components/umb-progress-circle.html',
+                scope: {
+                    size: '@?',
+                    percentage: '@',
+                    color: '@'
+                },
+                link: link
+            };
+            return directive;
+        }
+        angular.module('umbraco.directives').directive('umbProgressCircle', ProgressCircleDirective);
     }());
     /**
 @ngdoc directive
@@ -8778,6 +11218,116 @@ Use this directive make an element sticky and follow the page when scrolling.
         }
         angular.module('umbraco.directives').directive('umbStickyBar', StickyBarDirective);
     }());
+    /**
+@ngdoc directive
+@name umbraco.directives.directive:umbTable
+@restrict E
+@scope
+
+@description
+<strong>Added in Umbraco v. 7.4:</strong> Use this directive to render a data table.
+
+<h3>Markup example</h3>
+<pre>
+    <div ng-controller="My.TableController as vm">
+        
+        <umb-table
+            ng-if="items"
+            items="vm.items"
+            item-properties="vm.options.includeProperties"
+            allow-select-all="vm.allowSelectAll"
+            on-select="vm.selectItem"
+            on-click="vm.clickItem"
+            on-select-all="vm.selectAll"
+            on-selected-all="vm.isSelectedAll"
+            on-sorting-direction="vm.isSortDirection"
+            on-sort="vm.sort">
+        </umb-table>
+    
+    </div>
+</pre>
+
+<h3>Controller example</h3>
+<pre>
+    (function () {
+        "use strict";
+    
+        function Controller() {
+    
+            var vm = this;
+    
+            vm.items = [
+                {
+                    "icon": "icon-document",
+                    "name": "My node 1",
+                    "published": true,
+                    "description": "A short description of my node",
+                    "author": "Author 1"
+                },
+                {
+                    "icon": "icon-document",
+                    "name": "My node 2",
+                    "published": true,
+                    "description": "A short description of my node",
+                    "author": "Author 2"
+                }
+            ];
+
+            vm.options = {
+                includeProperties: [
+                    { alias: "description", header: "Description" },
+                    { alias: "author", header: "Author" }
+                ]
+            };
+    
+            vm.selectItem = selectItem;
+            vm.clickItem = clickItem;
+            vm.selectAll = selectAll;
+            vm.isSelectedAll = isSelectedAll;
+            vm.isSortDirection = isSortDirection;
+            vm.sort = sort;
+
+            function selectAll($event) {
+                alert("select all");
+            }
+
+            function isSelectedAll() {
+                
+            }
+    
+            function clickItem(item) {
+                alert("click node");
+            }
+
+            function selectItem(selectedItem, $index, $event) {
+                alert("select node");
+            }
+            
+            function isSortDirection(col, direction) {
+                
+            }
+            
+            function sort(field, allow, isSystem) {
+                
+            }
+    
+        }
+    
+        angular.module("umbraco").controller("My.TableController", Controller);
+    
+    })();
+</pre>
+
+@param {string} icon (<code>binding</code>): The node icon.
+@param {string} name (<code>binding</code>): The node name.
+@param {string} published (<code>binding</code>): The node published state.
+@param {function} onSelect (<code>expression</code>): Callback function when the row is selected.
+@param {function} onClick (<code>expression</code>): Callback function when the "Name" column link is clicked.
+@param {function} onSelectAll (<code>expression</code>): Callback function when selecting all items.
+@param {function} onSelectedAll (<code>expression</code>): Callback function when all items are selected.
+@param {function} onSortingDirection (<code>expression</code>): Callback function when sorting direction is changed.
+@param {function} onSort (<code>expression</code>): Callback function when sorting items.
+**/
     (function () {
         'use strict';
         function TableDirective(iconHelper) {
@@ -9096,12 +11646,14 @@ TODO
                         },
                         file: file
                     }).progress(function (evt) {
-                        // calculate progress in percentage
-                        var progressPercentage = parseInt(100 * evt.loaded / evt.total, 10);
-                        // set percentage property on file
-                        file.uploadProgress = progressPercentage;
-                        // set uploading status on file
-                        file.uploadStatus = 'uploading';
+                        if (file.uploadStat !== 'done' && file.uploadStat !== 'error') {
+                            // calculate progress in percentage
+                            var progressPercentage = parseInt(100 * evt.loaded / evt.total, 10);
+                            // set percentage property on file
+                            file.uploadProgress = progressPercentage;
+                            // set uploading status on file
+                            file.uploadStatus = 'uploading';
+                        }
                     }).success(function (data, status, headers, config) {
                         if (data.notifications && data.notifications.length > 0) {
                             // set error status on file
@@ -9113,6 +11665,7 @@ TODO
                         } else {
                             // set done status on file
                             file.uploadStatus = 'done';
+                            file.uploadProgress = 100;
                             // set date/time for when done - used for sorting
                             file.doneDate = new Date();
                             // Put the file in the done pool
@@ -9230,6 +11783,263 @@ TODO
         };
     }
     angular.module('umbraco.directives').directive('umbSingleFileUpload', umbSingleFileUpload);
+    (function () {
+        'use strict';
+        function ChangePasswordController($scope) {
+            function resetModel(isNew) {
+                //the model config will contain an object, if it does not we'll create defaults
+                //NOTE: We will not support doing the password regex on the client side because the regex on the server side
+                //based on the membership provider cannot always be ported to js from .net directly.        
+                /*
+      {
+          hasPassword: true/false,
+          requiresQuestionAnswer: true/false,
+          enableReset: true/false,
+          enablePasswordRetrieval: true/false,
+          minPasswordLength: 10
+      }
+      */
+                $scope.showReset = false;
+                //set defaults if they are not available
+                if ($scope.config.disableToggle === undefined) {
+                    $scope.config.disableToggle = false;
+                }
+                if ($scope.config.hasPassword === undefined) {
+                    $scope.config.hasPassword = false;
+                }
+                if ($scope.config.enablePasswordRetrieval === undefined) {
+                    $scope.config.enablePasswordRetrieval = true;
+                }
+                if ($scope.config.requiresQuestionAnswer === undefined) {
+                    $scope.config.requiresQuestionAnswer = false;
+                }
+                //don't enable reset if it is new - that doesn't make sense
+                if (isNew === 'true') {
+                    $scope.config.enableReset = false;
+                } else if ($scope.config.enableReset === undefined) {
+                    $scope.config.enableReset = true;
+                }
+                if ($scope.config.minPasswordLength === undefined) {
+                    $scope.config.minPasswordLength = 0;
+                }
+                //set the model defaults
+                if (!angular.isObject($scope.passwordValues)) {
+                    //if it's not an object then just create a new one
+                    $scope.passwordValues = {
+                        newPassword: null,
+                        oldPassword: null,
+                        reset: null,
+                        answer: null
+                    };
+                } else {
+                    //just reset the values
+                    if (!isNew) {
+                        //if it is new, then leave the generated pass displayed
+                        $scope.passwordValues.newPassword = null;
+                        $scope.passwordValues.oldPassword = null;
+                    }
+                    $scope.passwordValues.reset = null;
+                    $scope.passwordValues.answer = null;
+                }
+                //the value to compare to match passwords
+                if (!isNew) {
+                    $scope.passwordValues.confirm = '';
+                } else if ($scope.passwordValues.newPassword && $scope.passwordValues.newPassword.length > 0) {
+                    //if it is new and a new password has been set, then set the confirm password too
+                    $scope.passwordValues.confirm = $scope.passwordValues.newPassword;
+                }
+            }
+            resetModel($scope.isNew);
+            //if there is no password saved for this entity , it must be new so we do not allow toggling of the change password, it is always there
+            //with validators turned on.
+            $scope.changing = $scope.config.disableToggle === true || !$scope.config.hasPassword;
+            //we're not currently changing so set the model to null
+            if (!$scope.changing) {
+                $scope.passwordValues = null;
+            }
+            $scope.doChange = function () {
+                resetModel();
+                $scope.changing = true;
+                //if there was a previously generated password displaying, clear it
+                $scope.passwordValues.generatedPassword = null;
+                $scope.passwordValues.confirm = null;
+            };
+            $scope.cancelChange = function () {
+                $scope.changing = false;
+                //set model to null
+                $scope.passwordValues = null;
+            };
+            var unsubscribe = [];
+            //listen for the saved event, when that occurs we'll 
+            //change to changing = false;
+            unsubscribe.push($scope.$on('formSubmitted', function () {
+                if ($scope.config.disableToggle === false) {
+                    $scope.changing = false;
+                }
+            }));
+            unsubscribe.push($scope.$on('formSubmitting', function () {
+                //if there was a previously generated password displaying, clear it
+                if ($scope.changing && $scope.passwordValues) {
+                    $scope.passwordValues.generatedPassword = null;
+                } else if (!$scope.changing) {
+                    //we are not changing, so the model needs to be null
+                    $scope.passwordValues = null;
+                }
+            }));
+            //when the scope is destroyed we need to unsubscribe
+            $scope.$on('$destroy', function () {
+                for (var u in unsubscribe) {
+                    unsubscribe[u]();
+                }
+            });
+            $scope.showOldPass = function () {
+                return $scope.config.hasPassword && !$scope.config.allowManuallyChangingPassword && !$scope.config.enablePasswordRetrieval && !$scope.showReset;
+            };
+            //TODO: I don't think we need this or the cancel button, this can be up to the editor rendering this directive
+            $scope.showCancelBtn = function () {
+                return $scope.config.disableToggle !== true && $scope.config.hasPassword;
+            };
+        }
+        function ChangePasswordDirective() {
+            var directive = {
+                restrict: 'E',
+                replace: true,
+                templateUrl: 'views/components/users/change-password.html',
+                controller: 'Umbraco.Editors.Users.ChangePasswordDirectiveController',
+                scope: {
+                    isNew: '=?',
+                    passwordValues: '=',
+                    config: '='
+                }
+            };
+            return directive;
+        }
+        angular.module('umbraco.directives').controller('Umbraco.Editors.Users.ChangePasswordDirectiveController', ChangePasswordController);
+        angular.module('umbraco.directives').directive('changePassword', ChangePasswordDirective);
+    }());
+    (function () {
+        'use strict';
+        function PermissionDirective() {
+            function link(scope, el, attr, ctrl) {
+                scope.change = function () {
+                    scope.selected = !scope.selected;
+                    if (scope.onChange) {
+                        scope.onChange({ 'selected': scope.selected });
+                    }
+                };
+            }
+            var directive = {
+                restrict: 'E',
+                replace: true,
+                templateUrl: 'views/components/users/umb-permission.html',
+                scope: {
+                    name: '=',
+                    description: '=?',
+                    selected: '=',
+                    onChange: '&'
+                },
+                link: link
+            };
+            return directive;
+        }
+        angular.module('umbraco.directives').directive('umbPermission', PermissionDirective);
+    }());
+    /** 
+@ngdoc directive
+@name umbraco.directives.directive:umbUserGroupPreview
+@restrict E
+@scope
+
+@description
+Use this directive to render a user group preview, where you can see the permissions the user or group has in the back office.
+
+<h3>Markup example</h3>
+<pre>
+    <div>
+        <umb-user-group-preview
+            ng-repeat="userGroup in vm.user.userGroups"
+            icon="userGroup.icon"
+            name="userGroup.name"
+            sections="userGroup.sections"
+            content-start-node="userGroup.contentStartNode"
+            media-start-node="userGroup.mediaStartNode"
+            allow-remove="!vm.user.isCurrentUser"
+            on-remove="vm.removeSelectedItem($index, vm.user.userGroups)">
+        </umb-user-group-preview>
+    </div>
+</pre>
+
+@param {string} icon (<code>binding</code>): The user group icon.
+@param {string} name (<code>binding</code>): The user group name.
+@param {array} sections (<code>binding</code>) Lists out the sections where the user has authority to edit.
+@param {string} contentStartNode (<code>binding</code>)
+<ul>
+    <li>The starting point in the tree of the content section.</li>
+    <li>So the user has no authority to work on other branches, only on this branch in the content section.</li>
+</ul>
+@param {boolean} hideContentStartNode (<code>binding</code>) Hides the contentStartNode.
+@param {string} mediaStartNode (<code>binding</code>)
+<ul>
+<li> The starting point in the tree of the media section.</li>
+<li> So the user has no authority to work on other branches, only on this branch in the media section.</li>
+</ul>
+@param {boolean} hideMediaStartNode (<code>binding</code>) Hides the mediaStartNode.
+@param {array} permissions (<code>binding<code>) A list of permissions, the user can have.
+@param {boolean} allowRemove (<code>binding</code>): Shows or Hides the remove button.
+@param {function} onRemove (<code>expression</code>): Callback function when the remove button is clicked.
+@param {boolean} allowEdit (<code>binding</code>): Shows or Hides the edit button.
+@param {function} onEdit (<code>expression</code>): Callback function when the edit button is clicked.
+**/
+    (function () {
+        'use strict';
+        function UserGroupPreviewDirective() {
+            function link(scope, el, attr, ctrl) {
+            }
+            var directive = {
+                restrict: 'E',
+                replace: true,
+                templateUrl: 'views/components/users/umb-user-group-preview.html',
+                scope: {
+                    icon: '=?',
+                    name: '=',
+                    sections: '=?',
+                    contentStartNode: '=?',
+                    hideContentStartNode: '@?',
+                    mediaStartNode: '=?',
+                    hideMediaStartNode: '@?',
+                    permissions: '=?',
+                    allowRemove: '=?',
+                    allowEdit: '=?',
+                    onRemove: '&?',
+                    onEdit: '&?'
+                },
+                link: link
+            };
+            return directive;
+        }
+        angular.module('umbraco.directives').directive('umbUserGroupPreview', UserGroupPreviewDirective);
+    }());
+    (function () {
+        'use strict';
+        function UserPreviewDirective() {
+            function link(scope, el, attr, ctrl) {
+            }
+            var directive = {
+                restrict: 'E',
+                replace: true,
+                templateUrl: 'views/components/users/umb-user-preview.html',
+                scope: {
+                    avatars: '=?',
+                    name: '=',
+                    allowRemove: '=?',
+                    onRemove: '&?'
+                },
+                link: link
+            };
+            return directive;
+        }
+        angular.module('umbraco.directives').directive('umbUserPreview', UserPreviewDirective);
+    }());
     /**
  * Konami Code directive for AngularJS
  * @version v0.0.1
@@ -9297,6 +12107,110 @@ TODO
         }
     ]);
     /**
+@ngdoc directive
+@name umbraco.directives.directive:umbKeyboardList
+@restrict E
+
+@description
+<b>Added in versions 7.7.0</b>: Use this directive to add arrow up and down keyboard shortcuts to a list. Use this together with the {@link umbraco.directives.directive:umbDropdown umbDropdown} component to make easy accessible dropdown menus.
+
+<h3>Markup example</h3>
+<pre>
+    <div>
+        <ul umb-keyboard-list>
+            <li><a href="">Item 1</a></li>
+            <li><a href="">Item 2</a></li>
+            <li><a href="">Item 3</a></li>
+            <li><a href="">Item 4</a></li>
+            <li><a href="">Item 5</a></li>
+            <li><a href="">Item 6</a></li>
+        </ul>
+    </div>
+</pre>
+
+<h3>Use in combination with</h3>
+<ul>
+    <li>{@link umbraco.directives.directive:umbDropdown umbDropdown}</li>
+</ul>
+
+**/
+    angular.module('umbraco.directives').directive('umbKeyboardList', [
+        '$document',
+        '$timeout',
+        function ($document, $timeout) {
+            return {
+                restrict: 'A',
+                link: function (scope, element, attr) {
+                    var listItems = [];
+                    var currentIndex = 0;
+                    var focusSet = false;
+                    $timeout(function () {
+                        // get list of all links in the list
+                        listItems = element.find('li a');
+                    });
+                    // Handle keydown events
+                    function keydown(event) {
+                        $timeout(function () {
+                            checkFocus();
+                            // arrow down
+                            if (event.keyCode === 40) {
+                                arrowDown();
+                            }
+                            // arrow up
+                            if (event.keyCode === 38) {
+                                arrowUp();
+                            }
+                        });
+                    }
+                    function checkFocus() {
+                        var found = false;
+                        // check if any element has focus
+                        angular.forEach(listItems, function (item, index) {
+                            if ($(item).is(':focus')) {
+                                // if an element already has focus set the
+                                // currentIndex so we navigate from that element
+                                currentIndex = index;
+                                focusSet = true;
+                                found = true;
+                            }
+                        });
+                        // If we don't find an element with focus we reset the currentIndex and the focusSet flag
+                        // we do this because you can have navigated away from the list with tab and we want to reset it if you navigate back
+                        if (!found) {
+                            currentIndex = 0;
+                            focusSet = false;
+                        }
+                    }
+                    function arrowDown() {
+                        if (currentIndex < listItems.length - 1) {
+                            // only bump the current index if the focus is already 
+                            // set else we just want to focus the first element
+                            if (focusSet) {
+                                currentIndex++;
+                            }
+                            listItems[currentIndex].focus();
+                            focusSet = true;
+                        }
+                    }
+                    function arrowUp() {
+                        if (currentIndex > 0) {
+                            currentIndex--;
+                            listItems[currentIndex].focus();
+                        }
+                    }
+                    // Stop to listen typing.
+                    function stopListening() {
+                        $document.off('keydown', keydown);
+                    }
+                    // Start listening to key typing.
+                    $document.on('keydown', keydown);
+                    // Stop listening when scope is destroyed.
+                    scope.$on('$destroy', stopListening);
+                }
+            };
+        }
+    ]);
+    /**
 * @ngdoc directive
 * @name umbraco.directives.directive:noDirtyCheck
 * @restrict A
@@ -9307,9 +12221,15 @@ TODO
             restrict: 'A',
             require: 'ngModel',
             link: function (scope, elm, attrs, ctrl) {
-                elm.focus(function () {
-                    ctrl.$pristine = false;
-                });
+                var alwaysFalse = {
+                    get: function () {
+                        return false;
+                    },
+                    set: function () {
+                    }
+                };
+                Object.defineProperty(ctrl, '$pristine', alwaysFalse);
+                Object.defineProperty(ctrl, '$dirty', alwaysFalse);
             }
         };
     }
@@ -9318,12 +12238,24 @@ TODO
         'use strict';
         function SetDirtyOnChange() {
             function link(scope, el, attr, ctrl) {
-                var initValue = attr.umbSetDirtyOnChange;
-                attr.$observe('umbSetDirtyOnChange', function (newValue) {
-                    if (newValue !== initValue) {
+                if (attr.ngModel) {
+                    scope.$watch(attr.ngModel, function (newValue, oldValue) {
+                        if (!newValue) {
+                            return;
+                        }
+                        if (newValue === oldValue) {
+                            return;
+                        }
                         ctrl.$setDirty();
-                    }
-                });
+                    }, true);
+                } else {
+                    var initValue = attr.umbSetDirtyOnChange;
+                    attr.$observe('umbSetDirtyOnChange', function (newValue) {
+                        if (newValue !== initValue) {
+                            ctrl.$setDirty();
+                        }
+                    });
+                }
             }
             var directive = {
                 require: '^form',
@@ -9336,10 +12268,14 @@ TODO
     }());
     angular.module('umbraco.directives.validation').directive('valCompare', function () {
         return {
-            require: 'ngModel',
-            link: function (scope, elem, attrs, ctrl) {
-                //TODO: Pretty sure this should be done using a requires ^form in the directive declaration	            
-                var otherInput = elem.inheritedData('$formController')[attrs.valCompare];
+            require: [
+                'ngModel',
+                '^form'
+            ],
+            link: function (scope, elem, attrs, ctrls) {
+                var ctrl = ctrls[0];
+                var formCtrl = ctrls[1];
+                var otherInput = formCtrl[attrs.valCompare];
                 ctrl.$parsers.push(function (value) {
                     if (value === otherInput.$viewValue) {
                         ctrl.$setValidity('valCompare', true);
@@ -9499,8 +12435,8 @@ TODO
         };
     }
     angular.module('umbraco.directives.validation').directive('valEmail', valEmail).factory('valEmailExpression', function () {
-        //NOTE: This is the fixed regex which is part of the newer angular
-        return { EMAIL_REGEXP: /^[a-z0-9!#$%&'*+\/=?^_`{|}~.-]+@[a-z0-9]([a-z0-9-]*[a-z0-9])?(\.[a-z0-9]([a-z0-9-]*[a-z0-9])?)*$/i };
+        var emailRegex = /^[a-z0-9!#$%&'*+\/=?^_`{|}~.-]+@[a-z0-9]([a-z0-9-]*[a-z0-9])?(\.[a-z0-9]([a-z0-9-]*[a-z0-9])?)*$/i;
+        return { EMAIL_REGEXP: emailRegex };
     });
     /**
 * @ngdoc directive
@@ -10122,6 +13058,10 @@ TODO
         'use strict';
         function valSubViewDirective() {
             function link(scope, el, attr, ctrl) {
+                //if there are no containing form or valFormManager controllers, then we do nothing
+                if (!ctrl || !angular.isArray(ctrl) || ctrl.length !== 2 || !ctrl[0] || !ctrl[1]) {
+                    return;
+                }
                 var valFormManager = ctrl[1];
                 scope.subView.hasError = false;
                 //listen for form validation changes
@@ -10140,8 +13080,8 @@ TODO
             }
             var directive = {
                 require: [
-                    '^form',
-                    '^valFormManager'
+                    '?^form',
+                    '?^valFormManager'
                 ],
                 restrict: 'A',
                 link: link

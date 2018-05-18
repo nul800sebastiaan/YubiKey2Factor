@@ -33,7 +33,7 @@ namespace TwoFactorAuthentication.Controllers
             var tfa = new TwoFactorAuthenticator();
             var user = Security.CurrentUser;
             var accountSecretKey = Guid.NewGuid().ToString();
-            var setupInfo = tfa.GenerateSetupCode("TestApp", user.Email, accountSecretKey, 300, 300);
+            var setupInfo = tfa.GenerateSetupCode(Constants.ApplicationName, user.Email, accountSecretKey, 300, 300);
 
             var database = DatabaseContext.Database;
             var twoFactorAuthInfo = new TwoFactorAuthInfo();
@@ -65,7 +65,7 @@ namespace TwoFactorAuthentication.Controllers
             
             twoFactorAuthInfo.Secret = setupInfo.ManualEntryKey;
             twoFactorAuthInfo.Email = user.Email;
-            twoFactorAuthInfo.ApplicationName = "TestApp";
+            twoFactorAuthInfo.ApplicationName = Constants.ApplicationName;
 
             return twoFactorAuthInfo;
         }

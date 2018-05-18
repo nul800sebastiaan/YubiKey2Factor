@@ -23,13 +23,11 @@ namespace TwoFactorAuthentication.Middleware
             app.SetUmbracoLoggerFactory();
             app.UseTwoFactorSignInCookie(Umbraco.Core.Constants.Security.BackOfficeTwoFactorAuthenticationType, TimeSpan.FromMinutes(5));
 
-            #region pv
             // We need to set these values again after our custom changes. Otherwise preview doesn't work.
             app.UseUmbracoBackOfficeCookieAuthentication(applicationContext)
                 .UseUmbracoBackOfficeExternalCookieAuthentication(applicationContext)
                 .UseUmbracoPreviewAuthentication(applicationContext);
-            #endregion
-
+            
             app.ConfigureUserManagerForUmbracoBackOffice<TwoFactorBackOfficeUserManager, BackOfficeIdentityUser>(
                 applicationContext,
                 (options, context) =>
@@ -37,6 +35,7 @@ namespace TwoFactorAuthentication.Middleware
                     var membershipProvider = MembershipProviderExtensions.GetUsersMembershipProvider().AsUmbracoMembershipProvider();
                     var userManager = TwoFactorBackOfficeUserManager.Create(options,
                         applicationContext.Services.UserService,
+                        applicationContext.Services.EntityService,
                         applicationContext.Services.ExternalLoginService,
                         membershipProvider);
                     return userManager;

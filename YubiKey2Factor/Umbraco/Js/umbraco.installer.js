@@ -1,5 +1,5 @@
 (function () {
-    angular.module('umbraco.install', []);
+    angular.module('umbraco.install', ['umbraco.directives']);
     angular.module('umbraco.install').controller('Umbraco.InstallerController', function ($scope, installerService) {
         //TODO: Decouple the service from the controller - the controller should be responsible
         // for the model (state) and the service should be responsible for helping the controller,
@@ -48,7 +48,7 @@
         //add to umbraco installer facts here
         var facts = [
             'Umbraco helped millions of people watch a man jump from the edge of space',
-            'Over 420 000 websites are currently powered by Umbraco',
+            'Over 440 000 websites are currently powered by Umbraco',
             'At least 2 people have named their cat \'Umbraco\'',
             'On an average day, more than 1000 people download Umbraco',
             '<a target="_blank" href="https://umbraco.tv">umbraco.tv</a> is the premier source of Umbraco video tutorials to get you started',
@@ -62,10 +62,10 @@
             'At least 4 people have the Umbraco logo tattooed on them',
             '\'Umbraco\' is the danish name for an allen key',
             'Umbraco has been around since 2005, that\'s a looong time in IT',
-            'More than 550 people from all over the world meet each year in Denmark in June for our annual conference <a target=\'_blank\' href=\'https://umbra.co/codegarden\'>CodeGarden</a>',
+            'More than 600 people from all over the world meet each year in Denmark in June for our annual conference <a target=\'_blank\' href=\'https://umbra.co/codegarden\'>CodeGarden</a>',
             'While you are installing Umbraco someone else on the other side of the planet is probably doing it too',
             'You can extend Umbraco without modifying the source code using either JavaScript or C#',
-            'Umbraco was installed in more than 165 countries in 2015'
+            'Umbraco has been installed in more than 198 countries'
         ];
         /**
         Returns the description for the step at a given index based on the order of the serverOrder of steps
@@ -369,6 +369,16 @@
             }
         };
     });
+    angular.module('umbraco.install').controller('Umbraco.Installer.MachineKeyController', function ($scope, installerService) {
+        $scope.continue = function () {
+            installerService.status.current.model = true;
+            installerService.forward();
+        };
+        $scope.ignoreKey = function () {
+            installerService.status.current.model = false;
+            installerService.forward();
+        };
+    });
     angular.module('umbraco.install').controller('Umbraco.Installer.PackagesController', function ($scope, installerService) {
         installerService.getPackages().then(function (response) {
             $scope.packages = response.data;
@@ -380,7 +390,7 @@
     });
     angular.module('umbraco.install').controller('Umbraco.Install.UserController', function ($scope, installerService) {
         $scope.passwordPattern = /.*/;
-        $scope.installer.current.model.subscribeToNewsLetter = true;
+        $scope.installer.current.model.subscribeToNewsLetter = false;
         if ($scope.installer.current.model.minNonAlphaNumericLength > 0) {
             var exp = '';
             for (var i = 0; i < $scope.installer.current.model.minNonAlphaNumericLength; i++) {

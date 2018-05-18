@@ -16,6 +16,7 @@ namespace TwoFactorAuthentication.Middleware
         public TwoFactorValidationProvider(IDataProtector protector) : base(protector)
         { }
 
+        /// <inheritdoc />
         /// <summary>
         /// Explicitly implement this interface method - which overrides the base class's implementation
         /// </summary>

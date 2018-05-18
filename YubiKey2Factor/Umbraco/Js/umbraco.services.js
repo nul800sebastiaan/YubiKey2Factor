@@ -218,6 +218,14 @@
             //Whether the context menu is being shown or not
             showMenu: null
         };
+        var drawerState = {
+            //this view to show
+            view: null,
+            // bind custom values to the drawer
+            model: null,
+            //Whether the drawer is being shown or not
+            showDrawer: null
+        };
         /** function to validate and set the state on a state object */
         function setState(stateObj, key, value, stateObjName) {
             if (!_.has(stateObj, key)) {
@@ -347,6 +355,33 @@
          */
             setMenuState: function (key, value) {
                 setState(menuState, key, value, 'menuState');
+            },
+            /**
+         * @ngdoc function
+         * @name umbraco.services.angularHelper#getDrawerState
+         * @methodOf umbraco.services.appState
+         * @function
+         *
+         * @description
+         * Returns the current drawer state value by key - we do not return an object here - we do NOT want this
+         * to be publicly mutable and allow setting arbitrary values
+         *
+         */
+            getDrawerState: function (key) {
+                return getState(drawerState, key, 'drawerState');
+            },
+            /**
+         * @ngdoc function
+         * @name umbraco.services.angularHelper#setDrawerState
+         * @methodOf umbraco.services.appState
+         * @function
+         *
+         * @description
+         * Sets a drawer state value by key
+         *
+         */
+            setDrawerState: function (key, value) {
+                setState(drawerState, key, value, 'drawerState');
             }
         };
     }
@@ -428,12 +463,12 @@
  * @ngdoc service
  * @name umbraco.services.assetsService
  *
- * @requires $q 
+ * @requires $q
  * @requires angularHelper
- *  
+ *
  * @description
  * Promise-based utillity service to lazy-load client-side dependencies inside angular controllers.
- * 
+ *
  * ##usage
  * To use, simply inject the assetsService into any controller that needs it, and make
  * sure the umbraco.services module is accesible - which it should be by default.
@@ -444,7 +479,7 @@
  *                 //this code executes when the dependencies are done loading
  *          });
  *      });
- * </pre> 
+ * </pre>
  *
  * You can also load individual files, which gives you greater control over what attibutes are passed to the file, as well as timeout
  *
@@ -464,11 +499,11 @@
  *                 //loadcss cannot determine when the css is done loading, so this will trigger instantly
  *          });
  *      });
- * </pre>  
+ * </pre>
  */
     angular.module('umbraco.services').factory('assetsService', function ($q, $log, angularHelper, umbRequestHelper, $rootScope, $http) {
         var initAssetsLoaded = false;
-        var appendRnd = function (url) {
+        function appendRnd(url) {
             //if we don't have a global umbraco obj yet, the app is bootstrapping
             if (!Umbraco.Sys.ServerVariables.application) {
                 return url;
@@ -477,7 +512,8 @@
             var _op = url.indexOf('?') > 0 ? '&' : '?';
             url = url + _op + 'umb__rnd=' + rnd;
             return url;
-        };
+        }
+        ;
         function convertVirtualPath(path) {
             //make this work for virtual paths
             if (path.startsWith('~/')) {
@@ -500,7 +536,7 @@
                     return this.loadedAssets[path];
                 }
             },
-            /** 
+            /**
             Internal method. This is called when the application is loading and the user is already authenticated, or once the user is authenticated.
             There's a few assets the need to be loaded for the application to function but these assets require authentication to load.
         */
@@ -527,10 +563,10 @@
          *
          * @description
          * Injects a file as a stylesheet into the document head
-         * 
+         *
          * @param {String} path path to the css file to load
          * @param {Scope} scope optional scope to pass into the loader
-         * @param {Object} keyvalue collection of attributes to pass to the stylesheet element  
+         * @param {Object} keyvalue collection of attributes to pass to the stylesheet element
          * @param {Number} timeout in milliseconds
          * @returns {Promise} Promise object which resolves when the file has loaded
          */
@@ -544,14 +580,12 @@
                     asset.state = 'loading';
                     LazyLoad.css(appendRnd(path), function () {
                         if (!scope) {
-                            asset.state = 'loaded';
-                            asset.deferred.resolve(true);
-                        } else {
-                            asset.state = 'loaded';
-                            angularHelper.safeApply(scope, function () {
-                                asset.deferred.resolve(true);
-                            });
+                            scope = $rootScope;
                         }
+                        asset.state = 'loaded';
+                        angularHelper.safeApply(scope, function () {
+                            asset.deferred.resolve(true);
+                        });
                     });
                 } else if (asset.state === 'loaded') {
                     asset.deferred.resolve(true);
@@ -565,10 +599,10 @@
          *
          * @description
          * Injects a file as a javascript into the document
-         * 
+         *
          * @param {String} path path to the js file to load
          * @param {Scope} scope optional scope to pass into the loader
-         * @param {Object} keyvalue collection of attributes to pass to the script element  
+         * @param {Object} keyvalue collection of attributes to pass to the script element
          * @param {Number} timeout in milliseconds
          * @returns {Promise} Promise object which resolves when the file has loaded
          */
@@ -582,14 +616,12 @@
                     asset.state = 'loading';
                     LazyLoad.js(appendRnd(path), function () {
                         if (!scope) {
-                            asset.state = 'loaded';
-                            asset.deferred.resolve(true);
-                        } else {
-                            asset.state = 'loaded';
-                            angularHelper.safeApply(scope, function () {
-                                asset.deferred.resolve(true);
-                            });
+                            scope = $rootScope;
                         }
+                        asset.state = 'loaded';
+                        angularHelper.safeApply(scope, function () {
+                            asset.deferred.resolve(true);
+                        });
                     });
                 } else if (asset.state === 'loaded') {
                     asset.deferred.resolve(true);
@@ -602,8 +634,8 @@
          * @methodOf umbraco.services.assetsService
          *
          * @description
-         * Injects a collection of files, this can be ONLY js files
-         * 
+         * Injects a collection of css and js files
+         *
          *
          * @param {Array} pathArray string array of paths to the files to load
          * @param {Scope} scope optional scope to pass into the loader
@@ -614,48 +646,66 @@
                 if (!angular.isArray(pathArray)) {
                     throw 'pathArray must be an array';
                 }
+                // Check to see if there's anything to load, resolve promise if not
                 var nonEmpty = _.reject(pathArray, function (item) {
                     return item === undefined || item === '';
                 });
-                //don't load anything if there's nothing to load
-                if (nonEmpty.length > 0) {
-                    var promises = [];
-                    var assets = [];
-                    //compile a list of promises
-                    //blocking
-                    _.each(nonEmpty, function (path) {
-                        path = convertVirtualPath(path);
-                        var asset = service._getAssetPromise(path);
-                        //if not previously loaded, add to list of promises
-                        if (asset.state !== 'loaded') {
-                            if (asset.state === 'new') {
-                                asset.state = 'loading';
-                                assets.push(asset);
-                            }
-                            //we need to always push to the promises collection to monitor correct 
-                            //execution                        
-                            promises.push(asset.deferred.promise);
-                        }
-                    });
-                    //gives a central monitoring of all assets to load
-                    promise = $q.all(promises);
-                    _.each(assets, function (asset) {
-                        LazyLoad.js(appendRnd(asset.path), function () {
-                            asset.state = 'loaded';
-                            if (!scope) {
-                                asset.deferred.resolve(true);
-                            } else {
-                                angularHelper.safeApply(scope, function () {
-                                    asset.deferred.resolve(true);
-                                });
-                            }
-                        });
-                    });
-                } else {
-                    //return and resolve
+                if (nonEmpty.length === 0) {
                     var deferred = $q.defer();
                     promise = deferred.promise;
                     deferred.resolve(true);
+                    return promise;
+                }
+                //compile a list of promises
+                //blocking
+                var promises = [];
+                var assets = [];
+                _.each(nonEmpty, function (path) {
+                    path = convertVirtualPath(path);
+                    var asset = service._getAssetPromise(path);
+                    //if not previously loaded, add to list of promises
+                    if (asset.state !== 'loaded') {
+                        if (asset.state === 'new') {
+                            asset.state = 'loading';
+                            assets.push(asset);
+                        }
+                        //we need to always push to the promises collection to monitor correct execution
+                        promises.push(asset.deferred.promise);
+                    }
+                });
+                //gives a central monitoring of all assets to load
+                promise = $q.all(promises);
+                // Split into css and js asset arrays, and use LazyLoad on each array
+                var cssAssets = _.filter(assets, function (asset) {
+                    return asset.path.match(/(\.css$|\.css\?)/ig);
+                });
+                var jsAssets = _.filter(assets, function (asset) {
+                    return asset.path.match(/(\.js$|\.js\?)/ig);
+                });
+                function assetLoaded(asset) {
+                    asset.state = 'loaded';
+                    if (!scope) {
+                        scope = $rootScope;
+                    }
+                    angularHelper.safeApply(scope, function () {
+                        asset.deferred.resolve(true);
+                    });
+                }
+                if (cssAssets.length > 0) {
+                    var cssPaths = _.map(cssAssets, function (asset) {
+                        return appendRnd(asset.path);
+                    });
+                    LazyLoad.css(cssPaths, function () {
+                        _.each(cssAssets, assetLoaded);
+                    });
+                }
+                if (jsAssets.length > 0) {
+                    var jsPaths = _.map(jsAssets, function (asset) {
+                        return appendRnd(asset.path);
+                    });
+                    LazyLoad.js(jsPaths, function () {
+                        _.each(jsAssets, assetLoaded);
+                    });
                 }
                 return promise;
             }
@@ -663,12 +713,102 @@
         return service;
     });
     /**
+ @ngdoc service
+ * @name umbraco.services.backdropService
+ *
+ * @description
+ * <b>Added in Umbraco 7.8</b>. Application-wide service for handling backdrops.
+ * 
+ */
+    (function () {
+        'use strict';
+        function backdropService(eventsService) {
+            var args = {
+                opacity: null,
+                element: null,
+                elementPreventClick: false,
+                disableEventsOnClick: false,
+                show: false
+            };
+            /**
+         * @ngdoc method
+         * @name umbraco.services.backdropService#open
+         * @methodOf umbraco.services.backdropService
+         *
+         * @description
+         * Raises an event to open a backdrop
+		 * @param {Object} options The backdrop options
+         * @param {Number} options.opacity Sets the opacity on the backdrop (default 0.4)
+         * @param {DomElement} options.element Highlights a DOM-element (HTML-selector)
+         * @param {Boolean} options.elementPreventClick Adds blocking element on top of highligted area to prevent all clicks
+         * @param {Boolean} options.disableEventsOnClick Disables all raised events when the backdrop is clicked
+		 */
+            function open(options) {
+                if (options && options.element) {
+                    args.element = options.element;
+                }
+                if (options && options.disableEventsOnClick) {
+                    args.disableEventsOnClick = options.disableEventsOnClick;
+                }
+                args.show = true;
+                eventsService.emit('appState.backdrop', args);
+            }
+            /**
+         * @ngdoc method
+         * @name umbraco.services.backdropService#close
+         * @methodOf umbraco.services.backdropService
+         *
+         * @description
+         * Raises an event to close the backdrop
+         * 
+		 */
+            function close() {
+                args.element = null;
+                args.show = false;
+                eventsService.emit('appState.backdrop', args);
+            }
+            /**
+         * @ngdoc method
+         * @name umbraco.services.backdropService#setOpacity
+         * @methodOf umbraco.services.backdropService
+         *
+         * @description
+         * Raises an event which updates the opacity option on the backdrop
+		 */
+            function setOpacity(opacity) {
+                args.opacity = opacity;
+                eventsService.emit('appState.backdrop', args);
+            }
+            /**
+         * @ngdoc method
+         * @name umbraco.services.backdropService#setHighlight
+         * @methodOf umbraco.services.backdropService
+         *
+         * @description
+         * Raises an event which updates the element option on the backdrop
+		 */
+            function setHighlight(element, preventClick) {
+                args.element = element;
+                args.elementPreventClick = preventClick;
+                eventsService.emit('appState.backdrop', args);
+            }
+            var service = {
+                open: open,
+                close: close,
+                setOpacity: setOpacity,
+                setHighlight: setHighlight
+            };
+            return service;
+        }
+        angular.module('umbraco.services').factory('backdropService', backdropService);
+    }());
+    /**
 * @ngdoc service
 * @name umbraco.services.contentEditingHelper
 * @description A helper service for most editors, some methods are specific to content/media/member model types but most are used by
 * all editors to share logic and reduce the amount of replicated code among editors.
 **/
-    function contentEditingHelper(fileManager, $q, $location, $routeParams, notificationsService, serverValidationManager, dialogService, formHelper, appState) {
+    function contentEditingHelper(fileManager, $q, $location, $routeParams, notificationsService, localizationService, serverValidationManager, dialogService, formHelper, appState) {
         function isValidIdentifier(id) {
             //empty id <= 0
             if (angular.isNumber(id) && id > 0) {
@@ -686,6 +826,7 @@
         }
         return {
             /** Used by the content editor and mini content editor to perform saving operations */
+            //TODO: Make this a more helpful/reusable method for other form operations! we can simplify this form most forms
             contentEditorPerformSave: function (args) {
                 if (!angular.isObject(args)) {
                     throw 'args must be an object';
@@ -755,6 +896,29 @@
                 }
                 return deferred.promise;
             },
+            /** Used by the content editor and media editor to add an info tab to the tabs array (normally known as the properties tab) */
+            addInfoTab: function (tabs) {
+                var infoTab = {
+                    'alias': '_umb_infoTab',
+                    'id': -1,
+                    'label': 'Info',
+                    'properties': []
+                };
+                // first check if tab is already added
+                var foundInfoTab = false;
+                angular.forEach(tabs, function (tab) {
+                    if (tab.id === infoTab.id && tab.alias === infoTab.alias) {
+                        foundInfoTab = true;
+                    }
+                });
+                // add info tab if is is not found
+                if (!foundInfoTab) {
+                    localizationService.localize('general_info').then(function (value) {
+                        infoTab.label = value;
+                        tabs.push(infoTab);
+                    });
+                }
+            },
             /** Returns the action button definitions based on what permissions the user has.
         The content.allowedActions parameter contains a list of chars, each represents a button by permission so
         here we'll build the buttons according to the chars of the user. */
@@ -784,7 +948,8 @@
                             labelKey: 'buttons_saveAndPublish',
                             handler: args.methods.saveAndPublish,
                             hotKey: 'ctrl+p',
-                            hotKeyWhenHidden: true
+                            hotKeyWhenHidden: true,
+                            alias: 'saveAndPublish'
                         };
                     case 'H':
                         //send to publish
@@ -793,7 +958,8 @@
                             labelKey: 'buttons_saveToPublish',
                             handler: args.methods.sendToPublish,
                             hotKey: 'ctrl+p',
-                            hotKeyWhenHidden: true
+                            hotKeyWhenHidden: true,
+                            alias: 'sendToPublish'
                         };
                     case 'A':
                         //save
@@ -802,7 +968,8 @@
                             labelKey: 'buttons_save',
                             handler: args.methods.save,
                             hotKey: 'ctrl+s',
-                            hotKeyWhenHidden: true
+                            hotKeyWhenHidden: true,
+                            alias: 'save'
                         };
                     case 'Z':
                         //unpublish
@@ -811,7 +978,8 @@
                             labelKey: 'content_unPublish',
                             handler: args.methods.unPublish,
                             hotKey: 'ctrl+u',
-                            hotKeyWhenHidden: true
+                            hotKeyWhenHidden: true,
+                            alias: 'unpublish'
                         };
                     default:
                         return null;
@@ -828,12 +996,21 @@
                 ];
                 //Create the first button (primary button)
                 //We cannot have the Save or SaveAndPublish buttons if they don't have create permissions when we are creating a new item.
+                //Another tricky rule is if they only have Create + Browse permissions but not Save but if it's being created then they will
+                // require the Save button in order to create.
+                //So this code is going to create the primary button (either Publish, SendToPublish, Save) if we are not in create mode
+                // or if the user has access to create.
                 if (!args.create || _.contains(args.content.allowedActions, 'C')) {
                     for (var b in buttonOrder) {
                         if (_.contains(args.content.allowedActions, buttonOrder[b])) {
                             buttons.defaultButton = createButtonDefinition(buttonOrder[b]);
                             break;
                         }
+                    }
+                    //Here's the special check, if the button still isn't set and we are creating and they have create access
+                    //we need to add the Save button
+                    if (!buttons.defaultButton && args.create && _.contains(args.content.allowedActions, 'C')) {
+                        buttons.defaultButton = createButtonDefinition('A');
                     }
                 }
                 //Now we need to make the drop down button list, this is also slightly tricky because:
@@ -855,6 +1032,32 @@
                         if (args.content.publishDate && _.contains(args.content.allowedActions, 'U')) {
                             buttons.subButtons.push(createButtonDefinition('Z'));
                         }
+                    }
+                }
+                // If we have a scheduled publish or unpublish date change the default button to 
+                // "save" and update the label to "save and schedule
+                if (args.content.releaseDate || args.content.removeDate) {
+                    // if save button is alread the default don't change it just update the label
+                    if (buttons.defaultButton && buttons.defaultButton.letter === 'A') {
+                        buttons.defaultButton.labelKey = 'buttons_saveAndSchedule';
+                        return;
+                    }
+                    if (buttons.defaultButton && buttons.subButtons && buttons.subButtons.length > 0) {
+                        // save a copy of the default so we can push it to the sub buttons later
+                        var defaultButtonCopy = angular.copy(buttons.defaultButton);
+                        var newSubButtons = [];
+                        // if save button is not the default button - find it and make it the default
+                        angular.forEach(buttons.subButtons, function (subButton) {
+                            if (subButton.letter === 'A') {
+                                buttons.defaultButton = subButton;
+                                buttons.defaultButton.labelKey = 'buttons_saveAndSchedule';
+                            } else {
+                                newSubButtons.push(subButton);
+                            }
+                        });
+                        // push old default button into subbuttons
+                        newSubButtons.push(defaultButtonCopy);
+                        buttons.subButtons = newSubButtons;
                     }
                 }
                 return buttons;
@@ -1070,11 +1273,7 @@
                         }
                         //indicates we've handled the server result
                         return true;
-                    } else {
-                        dialogService.ysodDialog(args.err);
                     }
-                } else {
-                    dialogService.ysodDialog(args.err);
                 }
                 return false;
             },
@@ -2092,45 +2291,20 @@
     app.authenticated
     app.notAuthenticated
     app.closeDialogs
+    app.ysod
+    app.reInitialize
+    app.userRefresh
 */
     function eventsService($q, $rootScope) {
         return {
-            /** raise an event with a given name, returns an array of promises for each listener */
+            /** raise an event with a given name */
             emit: function (name, args) {
                 //there are no listeners
                 if (!$rootScope.$$listeners[name]) {
-                    return;    //return [];
+                    return;
                 }
                 //send the event
-                $rootScope.$emit(name, args);    //PP: I've commented out the below, since we currently dont
-                                                 // expose the eventsService as a documented api
-                                                 // and think we need to figure out our usecases for this
-                                                 // since the below modifies the return value of the then on() method
-                                                 /*
-            //setup a deferred promise for each listener
-            var deferred = [];
-            for (var i = 0; i < $rootScope.$$listeners[name].length; i++) {
-                deferred.push($q.defer());
-            }*/
-                                                 //create a new event args object to pass to the 
-                                                 // $emit containing methods that will allow listeners
-                                                 // to return data in an async if required
-                                                 /*
-            var eventArgs = {
-                args: args,
-                reject: function (a) {
-                    deferred.pop().reject(a);
-                },
-                resolve: function (a) {
-                    deferred.pop().resolve(a);
-                }
-            };*/
-                                                 /*
-            //return an array of promises
-            var promises = _.map(deferred, function(p) {
-                return p.promise;
-            });
-            return promises;*/
+                $rootScope.$emit(name, args);
             },
             /** subscribe to a method, or use scope.$on = same thing */
             on: function (name, callback) {
@@ -2302,12 +2476,20 @@
                 }
                 //clear the status
                 args.scope[args.statusPropertyName] = null;
+                this.showNotifications(args);
+                args.scope.$broadcast('formSubmitted', { scope: args.scope });
+            },
+            showNotifications: function (args) {
+                if (!args || !args.notifications) {
+                    return false;
+                }
                 if (angular.isArray(args.notifications)) {
                     for (var i = 0; i < args.notifications.length; i++) {
                         notificationsService.showNotification(args.notifications[i]);
                     }
+                    return true;
                 }
-                args.scope.$broadcast('formSubmitted', { scope: args.scope });
+                return false;
             },
             /**
          * @ngdoc function
@@ -2398,7 +2580,7 @@
         };
         return service;
     });
-    angular.module('umbraco.services').factory('helpService', function ($http, $q) {
+    angular.module('umbraco.services').factory('helpService', function ($http, $q, umbRequestHelper) {
         var helpTopics = {};
         var defaultUrl = 'http://our.umbraco.org/rss/help';
         var tvUrl = 'http://umbraco.tv/feeds/help';
@@ -2444,6 +2626,17 @@
             findVideos: function (args) {
                 var url = service.getUrl(tvUrl, args);
                 return fetchUrl(url);
+            },
+            getContextHelpForPage: function (section, tree, baseurl) {
+                var qs = '?section=' + section + '&tree=' + tree;
+                if (tree) {
+                    qs += '&tree=' + tree;
+                }
+                if (baseurl) {
+                    qs += '&baseurl=' + encodeURIComponent(baseurl);
+                }
+                var url = umbRequestHelper.getApiUrl('helpApiBaseUrl', 'GetContextHelpForPage' + qs);
+                return umbRequestHelper.resourcePromise($http.get(url), 'Failed to get lessons content');
             },
             getUrl: function (url, args) {
                 return url + '?' + $.param(args);
@@ -2569,6 +2762,25 @@
 		 */
             getCurrent: function () {
                 return nArray;
+            },
+            /**
+		 * @ngdoc method
+		 * @name umbraco.services.historyService#getLastAccessedItemForSection
+		 * @methodOf umbraco.services.historyService
+		 *
+		 * @description
+		 * Method to return the item that was last accessed in the given section
+		 *
+         * @param {string} sectionAlias Alias of the section to return the last accessed item for.
+		 */
+            getLastAccessedItemForSection: function (sectionAlias) {
+                for (var i = 0, len = nArray.length; i < len; i++) {
+                    var item = nArray[i];
+                    if (item.link.indexOf(sectionAlias + '/') === 0) {
+                        return item;
+                    }
+                }
+                return null;
             }
         };
     });
@@ -2996,6 +3208,27 @@
         };
     }
     angular.module('umbraco.services').factory('imageHelper', imageHelper);
+    (function () {
+        'use strict';
+        function javascriptLibraryService($q, $http, umbRequestHelper) {
+            var existingLocales = [];
+            function getSupportedLocalesForMoment() {
+                var deferred = $q.defer();
+                if (existingLocales.length === 0) {
+                    umbRequestHelper.resourcePromise($http.get(umbRequestHelper.getApiUrl('backOfficeAssetsApiBaseUrl', 'GetSupportedMomentLocales')), 'Failed to get cultures').then(function (locales) {
+                        existingLocales = locales;
+                        deferred.resolve(existingLocales);
+                    });
+                } else {
+                    deferred.resolve(existingLocales);
+                }
+                return deferred.promise;
+            }
+            var service = { getSupportedLocalesForMoment: getSupportedLocalesForMoment };
+            return service;
+        }
+        angular.module('umbraco.services').factory('javascriptLibraryService', javascriptLibraryService);
+    }());
     // This service was based on OpenJS library available in BSD License
     // http://www.openjs.com/scripts/events/keyboard_shortcuts/index.php
     function keyboardService($window, $timeout) {
@@ -4564,6 +4797,10 @@
             },
             getAllowedImagetypes: function (mediaId) {
                 //TODO: This is horribly inneficient - why make one request per type!?
+                //This should make a call to c# to get exactly what it's looking for instead of returning every single media type and doing 
+                //some filtering on the client side.
+                //This is also called multiple times when it's not needed! Example, when launching the media picker, this will be called twice 
+                //which means we'll be making at least 6 REST calls to fetch each media type
                 // Get All allowedTypes
                 return mediaTypeResource.getAllowedTypes(mediaId).then(function (types) {
                     var allowedQ = types.map(function (type) {
@@ -4612,8 +4849,20 @@
  * @description
  * Defines the methods that are called when menu items declare only an action to execute
  */
-    function umbracoMenuActions($q, treeService, $location, navigationService, appState) {
+    function umbracoMenuActions($q, treeService, $location, navigationService, appState, umbRequestHelper, notificationsService, localizationService) {
         return {
+            'ExportMember': function (args) {
+                var url = umbRequestHelper.getApiUrl('memberApiBaseUrl', 'ExportMemberData', [{ key: args.entity.id }]);
+                umbRequestHelper.downloadFile(url).then(function () {
+                    localizationService.localize('speechBubbles_memberExportedSuccess').then(function (value) {
+                        notificationsService.success(value);
+                    });
+                }, function (data) {
+                    localizationService.localize('speechBubbles_memberExportedError').then(function (value) {
+                        notificationsService.error(value);
+                    });
+                });
+            },
             /**
          * @ngdoc method
          * @name umbraco.services.umbracoMenuActions#RefreshNode
@@ -4985,8 +5234,10 @@
                     throw 'args.tree cannot be null';
                 }
                 if (mainTreeEventHandler) {
-                    //returns a promise
-                    return mainTreeEventHandler.syncTree(args);
+                    if (mainTreeEventHandler.syncTree) {
+                        //returns a promise,
+                        return mainTreeEventHandler.syncTree(args);
+                    }
                 }
                 //couldn't sync
                 return angularHelper.rejectedPromise();
@@ -5180,32 +5431,6 @@
                     show: true
                 });
                 return service.userDialog;
-            },
-            /**
-         * @ngdoc method
-         * @name umbraco.services.navigationService#showUserDialog
-         * @methodOf umbraco.services.navigationService
-         *
-         * @description
-         * Opens the user dialog, next to the sections navigation
-         * template is located in views/common/dialogs/user.html
-         */
-            showHelpDialog: function () {
-                // hide tray and close user dialog
-                service.hideTray();
-                if (service.userDialog) {
-                    service.userDialog.close();
-                }
-                if (service.helpDialog) {
-                    service.helpDialog.close();
-                    service.helpDialog = undefined;
-                }
-                service.helpDialog = dialogService.open({
-                    template: 'views/common/dialogs/help.html',
-                    modalClass: 'umb-modal-left',
-                    show: true
-                });
-                return service.helpDialog;
             },
             /**
          * @ngdoc method
@@ -5712,134 +5937,116 @@
  *       }) 
  * </pre> 
  */
-    angular.module('umbraco.services').factory('searchService', function ($q, $log, entityResource, contentResource, umbRequestHelper) {
-        function configureMemberResult(member) {
-            member.menuUrl = umbRequestHelper.getApiUrl('memberTreeBaseUrl', 'GetMenu', [
-                { id: member.id },
-                { application: 'member' }
-            ]);
-            member.editorPath = 'member/member/edit/' + (member.key ? member.key : member.id);
-            angular.extend(member.metaData, { treeAlias: 'member' });
-            member.subTitle = member.metaData.Email;
-        }
-        function configureMediaResult(media) {
-            media.menuUrl = umbRequestHelper.getApiUrl('mediaTreeBaseUrl', 'GetMenu', [
-                { id: media.id },
-                { application: 'media' }
-            ]);
-            media.editorPath = 'media/media/edit/' + media.id;
-            angular.extend(media.metaData, { treeAlias: 'media' });
-        }
-        function configureContentResult(content) {
-            content.menuUrl = umbRequestHelper.getApiUrl('contentTreeBaseUrl', 'GetMenu', [
-                { id: content.id },
-                { application: 'content' }
-            ]);
-            content.editorPath = 'content/content/edit/' + content.id;
-            angular.extend(content.metaData, { treeAlias: 'content' });
-            content.subTitle = content.metaData.Url;
-        }
+    angular.module('umbraco.services').factory('searchService', function ($q, $log, entityResource, contentResource, umbRequestHelper, $injector, searchResultFormatter) {
         return {
             /**
-        * @ngdoc method
-        * @name umbraco.services.searchService#searchMembers
-        * @methodOf umbraco.services.searchService
-        *
-        * @description
-        * Searches the default member search index
-        * @param {Object} args argument object
-        * @param {String} args.term seach term
-        * @returns {Promise} returns promise containing all matching members
-        */
+            * @ngdoc method
+            * @name umbraco.services.searchService#searchMembers
+            * @methodOf umbraco.services.searchService
+            *
+            * @description
+            * Searches the default member search index
+            * @param {Object} args argument object
+            * @param {String} args.term seach term
+            * @returns {Promise} returns promise containing all matching members
+            */
             searchMembers: function (args) {
                 if (!args.term) {
                     throw 'args.term is required';
                 }
                 return entityResource.search(args.term, 'Member', args.searchFrom).then(function (data) {
                     _.each(data, function (item) {
-                        configureMemberResult(item);
+                        searchResultFormatter.configureMemberResult(item);
                     });
                     return data;
                 });
             },
             /**
-        * @ngdoc method
-        * @name umbraco.services.searchService#searchContent
-        * @methodOf umbraco.services.searchService
-        *
-        * @description
-        * Searches the default internal content search index
-        * @param {Object} args argument object
-        * @param {String} args.term seach term
-        * @returns {Promise} returns promise containing all matching content items
-        */
+            * @ngdoc method
+            * @name umbraco.services.searchService#searchContent
+            * @methodOf umbraco.services.searchService
+            *
+            * @description
+            * Searches the default internal content search index
+            * @param {Object} args argument object
+            * @param {String} args.term seach term
+            * @returns {Promise} returns promise containing all matching content items
+            */
             searchContent: function (args) {
                 if (!args.term) {
                     throw 'args.term is required';
                 }
                 return entityResource.search(args.term, 'Document', args.searchFrom, args.canceler).then(function (data) {
                     _.each(data, function (item) {
-                        configureContentResult(item);
+                        searchResultFormatter.configureContentResult(item);
                     });
                     return data;
                 });
             },
             /**
-        * @ngdoc method
-        * @name umbraco.services.searchService#searchMedia
-        * @methodOf umbraco.services.searchService
-        *
-        * @description
-        * Searches the default media search index
-        * @param {Object} args argument object
-        * @param {String} args.term seach term
-        * @returns {Promise} returns promise containing all matching media items
-        */
+            * @ngdoc method
+            * @name umbraco.services.searchService#searchMedia
+            * @methodOf umbraco.services.searchService
+            *
+            * @description
+            * Searches the default media search index
+            * @param {Object} args argument object
+            * @param {String} args.term seach term
+            * @returns {Promise} returns promise containing all matching media items
+            */
             searchMedia: function (args) {
                 if (!args.term) {
                     throw 'args.term is required';
                 }
                 return entityResource.search(args.term, 'Media', args.searchFrom).then(function (data) {
                     _.each(data, function (item) {
-                        configureMediaResult(item);
+                        searchResultFormatter.configureMediaResult(item);
                     });
                     return data;
                 });
             },
             /**
-        * @ngdoc method
-        * @name umbraco.services.searchService#searchAll
-        * @methodOf umbraco.services.searchService
-        *
-        * @description
-        * Searches all available indexes and returns all results in one collection
-        * @param {Object} args argument object
-        * @param {String} args.term seach term
-        * @returns {Promise} returns promise containing all matching items
-        */
+            * @ngdoc method
+            * @name umbraco.services.searchService#searchAll
+            * @methodOf umbraco.services.searchService
+            *
+            * @description
+            * Searches all available indexes and returns all results in one collection
+            * @param {Object} args argument object
+            * @param {String} args.term seach term
+            * @returns {Promise} returns promise containing all matching items
+            */
             searchAll: function (args) {
                 if (!args.term) {
                     throw 'args.term is required';
                 }
                 return entityResource.searchAll(args.term, args.canceler).then(function (data) {
                     _.each(data, function (resultByType) {
-                        switch (resultByType.type) {
-                        case 'Document':
-                            _.each(resultByType.results, function (item) {
-                                configureContentResult(item);
-                            });
-                            break;
-                        case 'Media':
-                            _.each(resultByType.results, function (item) {
-                                configureMediaResult(item);
-                            });
-                            break;
-                        case 'Member':
-                            _.each(resultByType.results, function (item) {
-                                configureMemberResult(item);
-                            });
-                            break;
+                        //we need to format the search result data to include things like the subtitle, urls, etc...
+                        // this is done with registered angular services as part of the SearchableTreeAttribute, if that 
+                        // is not found, than we format with the default formatter
+                        var formatterMethod = searchResultFormatter.configureDefaultResult;
+                        //check if a custom formatter is specified...
+                        if (resultByType.jsSvc) {
+                            var searchFormatterService = $injector.get(resultByType.jsSvc);
+                            if (searchFormatterService) {
+                                if (!resultByType.jsMethod) {
+                                    resultByType.jsMethod = 'format';
+                                }
+                                formatterMethod = searchFormatterService[resultByType.jsMethod];
+                                if (!formatterMethod) {
+                                    throw 'The method ' + resultByType.jsMethod + ' on the angular service ' + resultByType.jsSvc + ' could not be found';
+                                }
+                            }
                         }
+                        //now apply the formatter for each result
+                        _.each(resultByType.results, function (item) {
+                            formatterMethod.apply(this, [
+                                item,
+                                resultByType.treeAlias,
+                                resultByType.appAlias
+                            ]);
+                        });
                     });
                     return data;
                 });
@@ -5850,6 +6057,77 @@
             }
         };
     });
+    function searchResultFormatter(umbRequestHelper) {
+        function configureDefaultResult(content, treeAlias, appAlias) {
+            content.editorPath = appAlias + '/' + treeAlias + '/edit/' + content.id;
+            angular.extend(content.metaData, { treeAlias: treeAlias });
+        }
+        function configureContentResult(content, treeAlias, appAlias) {
+            content.menuUrl = umbRequestHelper.getApiUrl('contentTreeBaseUrl', 'GetMenu', [
+                { id: content.id },
+                { application: appAlias }
+            ]);
+            content.editorPath = appAlias + '/' + treeAlias + '/edit/' + content.id;
+            angular.extend(content.metaData, { treeAlias: treeAlias });
+            content.subTitle = content.metaData.Url;
+        }
+        function configureMemberResult(member, treeAlias, appAlias) {
+            member.menuUrl = umbRequestHelper.getApiUrl('memberTreeBaseUrl', 'GetMenu', [
+                { id: member.id },
+                { application: appAlias }
+            ]);
+            member.editorPath = appAlias + '/' + treeAlias + '/edit/' + (member.key ? member.key : member.id);
+            angular.extend(member.metaData, { treeAlias: treeAlias });
+            member.subTitle = member.metaData.Email;
+        }
+        function configureMediaResult(media, treeAlias, appAlias) {
+            media.menuUrl = umbRequestHelper.getApiUrl('mediaTreeBaseUrl', 'GetMenu', [
+                { id: media.id },
+                { application: appAlias }
+            ]);
+            media.editorPath = appAlias + '/' + treeAlias + '/edit/' + media.id;
+            angular.extend(media.metaData, { treeAlias: treeAlias });
+        }
+        return {
+            configureContentResult: configureContentResult,
+            configureMemberResult: configureMemberResult,
+            configureMediaResult: configureMediaResult,
+            configureDefaultResult: configureDefaultResult
+        };
+    }
+    angular.module('umbraco.services').factory('searchResultFormatter', searchResultFormatter);
+    /**
+ * @ngdoc service
+ * @name umbraco.services.sectionService
+ *
+ *  
+ * @description
+ * A service to return the sections (applications) to be listed in the navigation which are contextual to the current user
+ */
+    (function () {
+        'use strict';
+        function sectionService(userService, $q, sectionResource) {
+            function getSectionsForUser() {
+                var deferred = $q.defer();
+                userService.getCurrentUser().then(function (u) {
+                    //if they've already loaded, return them
+                    if (u.sections) {
+                        deferred.resolve(u.sections);
+                    } else {
+                        sectionResource.getSections().then(function (sections) {
+                            //set these to the user (cached), then the user changes, these will be wiped
+                            u.sections = sections;
+                            deferred.resolve(u.sections);
+                        });
+                    }
+                });
+                return deferred.promise;
+            }
+            var service = { getSectionsForUser: getSectionsForUser };
+            return service;
+        }
+        angular.module('umbraco.services').factory('sectionService', sectionService);
+    }());
     /**
  * @ngdoc service
  * @name umbraco.services.serverValidationManager
@@ -7154,6 +7432,258 @@
     }
     angular.module('umbraco.services').factory('tinyMceService', tinyMceService);
     /**
+ @ngdoc service
+ * @name umbraco.services.tourService
+ *
+ * @description
+ * <b>Added in Umbraco 7.8</b>. Application-wide service for handling tours.
+ */
+    (function () {
+        'use strict';
+        function tourService(eventsService, currentUserResource, $q, tourResource) {
+            var tours = [];
+            var currentTour = null;
+            /**
+         * Registers all tours from the server and returns a promise
+         */
+            function registerAllTours() {
+                tours = [];
+                return tourResource.getTours().then(function (tourFiles) {
+                    angular.forEach(tourFiles, function (tourFile) {
+                        angular.forEach(tourFile.tours, function (newTour) {
+                            validateTour(newTour);
+                            validateTourRegistration(newTour);
+                            tours.push(newTour);
+                        });
+                    });
+                    eventsService.emit('appState.tour.updatedTours', tours);
+                });
+            }
+            /**
+         * Method to return all of the tours as a new instance
+         */
+            function getTours() {
+                return tours;
+            }
+            /**
+         * @ngdoc method
+         * @name umbraco.services.tourService#startTour
+         * @methodOf umbraco.services.tourService
+         *
+         * @description
+         * Raises an event to start a tour
+         * @param {Object} tour The tour which should be started
+         */
+            function startTour(tour) {
+                validateTour(tour);
+                eventsService.emit('appState.tour.start', tour);
+                currentTour = tour;
+            }
+            /**
+         * @ngdoc method
+         * @name umbraco.services.tourService#endTour
+         * @methodOf umbraco.services.tourService
+         *
+         * @description
+         * Raises an event to end the current tour
+         */
+            function endTour(tour) {
+                eventsService.emit('appState.tour.end', tour);
+                currentTour = null;
+            }
+            /**
+         * Disables a tour for the user, raises an event and returns a promise
+         * @param {any} tour
+         */
+            function disableTour(tour) {
+                var deferred = $q.defer();
+                tour.disabled = true;
+                currentUserResource.saveTourStatus({
+                    alias: tour.alias,
+                    disabled: tour.disabled,
+                    completed: tour.completed
+                }).then(function () {
+                    eventsService.emit('appState.tour.end', tour);
+                    currentTour = null;
+                    deferred.resolve(tour);
+                });
+                return deferred.promise;
+            }
+            /**
+         * @ngdoc method
+         * @name umbraco.services.tourService#completeTour
+         * @methodOf umbraco.services.tourService
+         *
+         * @description
+         * Completes a tour for the user, raises an event and returns a promise
+         * @param {Object} tour The tour which should be completed
+         */
+            function completeTour(tour) {
+                var deferred = $q.defer();
+                tour.completed = true;
+                currentUserResource.saveTourStatus({
+                    alias: tour.alias,
+                    disabled: tour.disabled,
+                    completed: tour.completed
+                }).then(function () {
+                    eventsService.emit('appState.tour.complete', tour);
+                    currentTour = null;
+                    deferred.resolve(tour);
+                });
+                return deferred.promise;
+            }
+            /**
+         * @ngdoc method
+         * @name umbraco.services.tourService#getCurrentTour
+         * @methodOf umbraco.services.tourService
+         *
+         * @description
+         * Returns the current tour
+         * @returns {Object} Returns the current tour
+         */
+            function getCurrentTour() {
+                //TODO: This should be reset if a new user logs in
+                return currentTour;
+            }
+            /**
+         * @ngdoc method
+         * @name umbraco.services.tourService#getGroupedTours
+         * @methodOf umbraco.services.tourService
+         *
+         * @description
+         * Returns a promise of grouped tours with the current user statuses
+         * @returns {Array} All registered tours grouped by tour group
+         */
+            function getGroupedTours() {
+                var deferred = $q.defer();
+                var tours = getTours();
+                setTourStatuses(tours).then(function () {
+                    var groupedTours = [];
+                    tours.forEach(function (item) {
+                        var groupExists = false;
+                        var newGroup = {
+                            'group': '',
+                            'tours': []
+                        };
+                        groupedTours.forEach(function (group) {
+                            // extend existing group if it is already added
+                            if (group.group === item.group) {
+                                if (item.groupOrder) {
+                                    group.groupOrder = item.groupOrder;
+                                }
+                                groupExists = true;
+                                group.tours.push(item);
+                            }
+                        });
+                        // push new group to array if it doesn't exist
+                        if (!groupExists) {
+                            newGroup.group = item.group;
+                            if (item.groupOrder) {
+                                newGroup.groupOrder = item.groupOrder;
+                            }
+                            newGroup.tours.push(item);
+                            groupedTours.push(newGroup);
+                        }
+                    });
+                    deferred.resolve(groupedTours);
+                });
+                return deferred.promise;
+            }
+            /**
+         * @ngdoc method
+         * @name umbraco.services.tourService#getTourByAlias
+         * @methodOf umbraco.services.tourService
+         *
+         * @description
+         * Returns a promise of the tour found by alias with the current user statuses
+         * @param {Object} tourAlias The tour alias of the tour which should be returned
+         * @returns {Object} Tour object
+         */
+            function getTourByAlias(tourAlias) {
+                var deferred = $q.defer();
+                var tours = getTours();
+                setTourStatuses(tours).then(function () {
+                    var tour = _.findWhere(tours, { alias: tourAlias });
+                    deferred.resolve(tour);
+                });
+                return deferred.promise;
+            }
+            ///////////
+            /**
+         * Validates a tour object and makes sure it consists of the correct properties needed to start a tour
+         * @param {any} tour
+         */
+            function validateTour(tour) {
+                if (!tour) {
+                    throw 'A tour is not specified';
+                }
+                if (!tour.alias) {
+                    throw 'A tour alias is required';
+                }
+                if (!tour.steps) {
+                    throw 'Tour ' + tour.alias + ' is missing tour steps';
+                }
+                if (tour.steps && tour.steps.length === 0) {
+                    throw 'Tour ' + tour.alias + ' is missing tour steps';
+                }
+                if (tour.requiredSections.length === 0) {
+                    throw 'Tour ' + tour.alias + ' is missing the required sections';
+                }
+            }
+            /**
+         * Validates a tour before it gets registered in the service
+         * @param {any} tour
+         */
+            function validateTourRegistration(tour) {
+                // check for existing tours with the same alias
+                angular.forEach(tours, function (existingTour) {
+                    if (existingTour.alias === tour.alias) {
+                        throw 'A tour with the alias ' + tour.alias + ' is already registered';
+                    }
+                });
+            }
+            /**
+         * Based on the tours given, this will set each of the tour statuses (disabled/completed) based on what is stored against the current user
+         * @param {any} tours
+         */
+            function setTourStatuses(tours) {
+                var deferred = $q.defer();
+                currentUserResource.getTours().then(function (storedTours) {
+                    angular.forEach(storedTours, function (storedTour) {
+                        if (storedTour.completed === true) {
+                            angular.forEach(tours, function (tour) {
+                                if (storedTour.alias === tour.alias) {
+                                    tour.completed = true;
+                                }
+                            });
+                        }
+                        if (storedTour.disabled === true) {
+                            angular.forEach(tours, function (tour) {
+                                if (storedTour.alias === tour.alias) {
+                                    tour.disabled = true;
+                                }
+                            });
+                        }
+                    });
+                    deferred.resolve(tours);
+                });
+                return deferred.promise;
+            }
+            var service = {
+                registerAllTours: registerAllTours,
+                startTour: startTour,
+                endTour: endTour,
+                disableTour: disableTour,
+                completeTour: completeTour,
+                getCurrentTour: getCurrentTour,
+                getGroupedTours: getGroupedTours,
+                getTourByAlias: getTourByAlias
+            };
+            return service;
+        }
+        angular.module('umbraco.services').factory('tourService', tourService);
+    }());
+    /**
  * @ngdoc service
  * @name umbraco.services.treeService
  * @function
@@ -7191,43 +7721,56 @@
                 if (!parentNode.section) {
                     parentNode.section = section;
                 }
+                if (parentNode.metaData && parentNode.metaData.noAccess === true) {
+                    if (!parentNode.cssClasses) {
+                        parentNode.cssClasses = [];
+                    }
+                    parentNode.cssClasses.push('no-access');
+                }
                 //create a method outside of the loop to return the parent - otherwise jshint blows up
                 var funcParent = function () {
                     return parentNode;
                 };
                 for (var i = 0; i < treeNodes.length; i++) {
-                    treeNodes[i].level = childLevel;
+                    var treeNode = treeNodes[i];
+                    treeNode.level = childLevel;
                     //create a function to get the parent node, we could assign the parent node but 
                     // then we cannot serialize this entity because we have a cyclical reference.
                     // Instead we just make a function to return the parentNode.
-                    treeNodes[i].parent = funcParent;
+                    treeNode.parent = funcParent;
                     //set the section for each tree node - this allows us to reference this easily when accessing tree nodes
-                    treeNodes[i].section = section;
+                    treeNode.section = section;
                     //if there is not route path specified, then set it automatically,
                     //if this is a tree root node then we want to route to the section's dashboard
-                    if (!treeNodes[i].routePath) {
-                        if (treeNodes[i].metaData && treeNodes[i].metaData['treeAlias']) {
+                    if (!treeNode.routePath) {
+                        if (treeNode.metaData && treeNode.metaData['treeAlias']) {
                             //this is a root node
-                            treeNodes[i].routePath = section;
+                            treeNode.routePath = section;
                         } else {
-                            var treeAlias = this.getTreeAlias(treeNodes[i]);
-                            treeNodes[i].routePath = section + '/' + treeAlias + '/edit/' + treeNodes[i].id;
+                            var treeAlias = this.getTreeAlias(treeNode);
+                            treeNode.routePath = section + '/' + treeAlias + '/edit/' + treeNode.id;
                         }
                     }
                     //now, format the icon data
-                    if (treeNodes[i].iconIsClass === undefined || treeNodes[i].iconIsClass) {
-                        var converted = iconHelper.convertFromLegacyTreeNodeIcon(treeNodes[i]);
-                        treeNodes[i].cssClass = standardCssClass + ' ' + converted;
+                    if (treeNode.iconIsClass === undefined || treeNode.iconIsClass) {
+                        var converted = iconHelper.convertFromLegacyTreeNodeIcon(treeNode);
+                        treeNode.cssClass = standardCssClass + ' ' + converted;
                         if (converted.startsWith('.')) {
                             //its legacy so add some width/height
-                            treeNodes[i].style = 'height:16px;width:16px;';
+                            treeNode.style = 'height:16px;width:16px;';
                         } else {
-                            treeNodes[i].style = '';
+                            treeNode.style = '';
                         }
                     } else {
-                        treeNodes[i].style = 'background-image: url(\'' + treeNodes[i].iconFilePath + '\');';
+                        treeNode.style = 'background-image: url(\'' + treeNode.iconFilePath + '\');';
                         //we need an 'icon-' class in there for certain styles to work so if it is image based we'll add this
-                        treeNodes[i].cssClass = standardCssClass + ' legacy-custom-file';
+                        treeNode.cssClass = standardCssClass + ' legacy-custom-file';
+                    }
+                    if (treeNode.metaData && treeNode.metaData.noAccess === true) {
+                        if (!treeNode.cssClasses) {
+                            treeNode.cssClasses = [];
+                        }
+                        treeNode.cssClasses.push('no-access');
                     }
                 }
             },
@@ -7475,9 +8018,10 @@
                     return null;
                 }
                 for (var i = 0; i < treeNode.children.length; i++) {
-                    if (treeNode.children[i].children && angular.isArray(treeNode.children[i].children) && treeNode.children[i].children.length > 0) {
+                    var child = treeNode.children[i];
+                    if (child.children && angular.isArray(child.children) && child.children.length > 0) {
                         //recurse
-                        found = this.getDescendantNode(treeNode.children[i], id);
+                        found = this.getDescendantNode(child, id);
                         if (found) {
                             return found;
                         }
@@ -7824,6 +8368,297 @@
         };
     }
     angular.module('umbraco.services').factory('treeService', treeService);
+    (function () {
+        'use strict';
+        /**
+    * @ngdoc service
+    * @name umbraco.services.umbDataFormatter
+    * @description A helper object used to format/transform JSON Umbraco data, mostly used for persisting data to the server
+    **/
+        function umbDataFormatter() {
+            return {
+                formatChangePasswordModel: function (model) {
+                    if (!model) {
+                        return null;
+                    }
+                    var trimmed = _.omit(model, [
+                        'confirm',
+                        'generatedPassword'
+                    ]);
+                    //ensure that the pass value is null if all child properties are null
+                    var allNull = true;
+                    var vals = _.values(trimmed);
+                    for (var k = 0; k < vals.length; k++) {
+                        if (vals[k] !== null && vals[k] !== undefined) {
+                            allNull = false;
+                        }
+                    }
+                    if (allNull) {
+                        return null;
+                    }
+                    return trimmed;
+                },
+                formatContentTypePostData: function (displayModel, action) {
+                    //create the save model from the display model
+                    var saveModel = _.pick(displayModel, 'compositeContentTypes', 'isContainer', 'allowAsRoot', 'allowedTemplates', 'allowedContentTypes', 'alias', 'description', 'thumbnail', 'name', 'id', 'icon', 'trashed', 'key', 'parentId', 'alias', 'path');
+                    //TODO: Map these
+                    saveModel.allowedTemplates = _.map(displayModel.allowedTemplates, function (t) {
+                        return t.alias;
+                    });
+                    saveModel.defaultTemplate = displayModel.defaultTemplate ? displayModel.defaultTemplate.alias : null;
+                    var realGroups = _.reject(displayModel.groups, function (g) {
+                        //do not include these tabs
+                        return g.tabState === 'init';
+                    });
+                    saveModel.groups = _.map(realGroups, function (g) {
+                        var saveGroup = _.pick(g, 'inherited', 'id', 'sortOrder', 'name');
+                        var realProperties = _.reject(g.properties, function (p) {
+                            //do not include these properties
+                            return p.propertyState === 'init' || p.inherited === true;
+                        });
+                        var saveProperties = _.map(realProperties, function (p) {
+                            var saveProperty = _.pick(p, 'id', 'alias', 'description', 'validation', 'label', 'sortOrder', 'dataTypeId', 'groupId', 'memberCanEdit', 'showOnMemberProfile', 'isSensitiveData');
+                            return saveProperty;
+                        });
+                        saveGroup.properties = saveProperties;
+                        //if this is an inherited group and there are not non-inherited properties on it, then don't send up the data
+                        if (saveGroup.inherited === true && saveProperties.length === 0) {
+                            return null;
+                        }
+                        return saveGroup;
+                    });
+                    //we don't want any null groups
+                    saveModel.groups = _.reject(saveModel.groups, function (g) {
+                        return !g;
+                    });
+                    return saveModel;
+                },
+                /** formats the display model used to display the data type to the model used to save the data type */
+                formatDataTypePostData: function (displayModel, preValues, action) {
+                    var saveModel = {
+                        parentId: displayModel.parentId,
+                        id: displayModel.id,
+                        name: displayModel.name,
+                        selectedEditor: displayModel.selectedEditor,
+                        //set the action on the save model
+                        action: action,
+                        preValues: []
+                    };
+                    for (var i = 0; i < preValues.length; i++) {
+                        saveModel.preValues.push({
+                            key: preValues[i].alias,
+                            value: preValues[i].value
+                        });
+                    }
+                    return saveModel;
+                },
+                /** formats the display model used to display the user to the model used to save the user */
+                formatUserPostData: function (displayModel) {
+                    //create the save model from the display model
+                    var saveModel = _.pick(displayModel, 'id', 'parentId', 'name', 'username', 'culture', 'email', 'startContentIds', 'startMediaIds', 'userGroups', 'message', 'changePassword');
+                    saveModel.changePassword = this.formatChangePasswordModel(saveModel.changePassword);
+                    //make sure the userGroups are just a string array
+                    var currGroups = saveModel.userGroups;
+                    var formattedGroups = [];
+                    for (var i = 0; i < currGroups.length; i++) {
+                        if (!angular.isString(currGroups[i])) {
+                            formattedGroups.push(currGroups[i].alias);
+                        } else {
+                            formattedGroups.push(currGroups[i]);
+                        }
+                    }
+                    saveModel.userGroups = formattedGroups;
+                    //make sure the startnodes are just a string array
+                    var props = [
+                        'startContentIds',
+                        'startMediaIds'
+                    ];
+                    for (var m = 0; m < props.length; m++) {
+                        var startIds = saveModel[props[m]];
+                        if (!startIds) {
+                            continue;
+                        }
+                        var formattedIds = [];
+                        for (var j = 0; j < startIds.length; j++) {
+                            formattedIds.push(Number(startIds[j].id));
+                        }
+                        saveModel[props[m]] = formattedIds;
+                    }
+                    return saveModel;
+                },
+                /** formats the display model used to display the user group to the model used to save the user group*/
+                formatUserGroupPostData: function (displayModel, action) {
+                    //create the save model from the display model
+                    var saveModel = _.pick(displayModel, 'id', 'alias', 'name', 'icon', 'sections', 'users', 'defaultPermissions', 'assignedPermissions');
+                    // the start nodes cannot be picked as the property name needs to change - assign manually
+                    saveModel.startContentId = displayModel['contentStartNode'];
+                    saveModel.startMediaId = displayModel['mediaStartNode'];
+                    //set the action on the save model
+                    saveModel.action = action;
+                    if (!saveModel.id) {
+                        saveModel.id = 0;
+                    }
+                    //the permissions need to just be the array of permission letters, currently it will be a dictionary of an array
+                    var currDefaultPermissions = saveModel.defaultPermissions;
+                    var saveDefaultPermissions = [];
+                    _.each(currDefaultPermissions, function (value, key, list) {
+                        _.each(value, function (element, index, list) {
+                            if (element.checked) {
+                                saveDefaultPermissions.push(element.permissionCode);
+                            }
+                        });
+                    });
+                    saveModel.defaultPermissions = saveDefaultPermissions;
+                    //now format that assigned/content permissions
+                    var currAssignedPermissions = saveModel.assignedPermissions;
+                    var saveAssignedPermissions = {};
+                    _.each(currAssignedPermissions, function (nodePermissions, index) {
+                        saveAssignedPermissions[nodePermissions.id] = [];
+                        _.each(nodePermissions.allowedPermissions, function (permission, index) {
+                            if (permission.checked) {
+                                saveAssignedPermissions[nodePermissions.id].push(permission.permissionCode);
+                            }
+                        });
+                    });
+                    saveModel.assignedPermissions = saveAssignedPermissions;
+                    //make sure the sections are just a string array
+                    var currSections = saveModel.sections;
+                    var formattedSections = [];
+                    for (var i = 0; i < currSections.length; i++) {
+                        if (!angular.isString(currSections[i])) {
+                            formattedSections.push(currSections[i].alias);
+                        } else {
+                            formattedSections.push(currSections[i]);
+                        }
+                    }
+                    saveModel.sections = formattedSections;
+                    //make sure the user are just an int array
+                    var currUsers = saveModel.users;
+                    var formattedUsers = [];
+                    for (var j = 0; j < currUsers.length; j++) {
+                        if (!angular.isNumber(currUsers[j])) {
+                            formattedUsers.push(currUsers[j].id);
+                        } else {
+                            formattedUsers.push(currUsers[j]);
+                        }
+                    }
+                    saveModel.users = formattedUsers;
+                    //make sure the startnodes are just an int if one is set
+                    var props = [
+                        'startContentId',
+                        'startMediaId'
+                    ];
+                    for (var m = 0; m < props.length; m++) {
+                        var startId = saveModel[props[m]];
+                        if (!startId) {
+                            continue;
+                        }
+                        saveModel[props[m]] = startId.id;
+                    }
+                    saveModel.parentId = -1;
+                    return saveModel;
+                },
+                /** formats the display model used to display the member to the model used to save the member */
+                formatMemberPostData: function (displayModel, action) {
+                    //this is basically the same as for media but we need to explicitly add the username,email, password to the save model
+                    var saveModel = this.formatMediaPostData(displayModel, action);
+                    saveModel.key = displayModel.key;
+                    var genericTab = _.find(displayModel.tabs, function (item) {
+                        return item.id === 0;
+                    });
+                    //map the member login, email, password and groups
+                    var propLogin = _.find(genericTab.properties, function (item) {
+                        return item.alias === '_umb_login';
+                    });
+                    var propEmail = _.find(genericTab.properties, function (item) {
+                        return item.alias === '_umb_email';
+                    });
+                    var propPass = _.find(genericTab.properties, function (item) {
+                        return item.alias === '_umb_password';
+                    });
+                    var propGroups = _.find(genericTab.properties, function (item) {
+                        return item.alias === '_umb_membergroup';
+                    });
+                    saveModel.email = propEmail.value.trim();
+                    saveModel.username = propLogin.value.trim();
+                    saveModel.password = this.formatChangePasswordModel(propPass.value);
+                    var selectedGroups = [];
+                    for (var n in propGroups.value) {
+                        if (propGroups.value[n] === true) {
+                            selectedGroups.push(n);
+                        }
+                    }
+                    saveModel.memberGroups = selectedGroups;
+                    //turn the dictionary into an array of pairs
+                    var memberProviderPropAliases = _.pairs(displayModel.fieldConfig);
+                    _.each(displayModel.tabs, function (tab) {
+                        _.each(tab.properties, function (prop) {
+                            var foundAlias = _.find(memberProviderPropAliases, function (item) {
+                                return prop.alias === item[1];
+                            });
+                            if (foundAlias) {
+                                //we know the current property matches an alias, now we need to determine which membership provider property it was for
+                                // by looking at the key
+                                switch (foundAlias[0]) {
+                                case 'umbracoMemberLockedOut':
+                                    saveModel.isLockedOut = prop.value ? prop.value.toString() === '1' ? true : false : false;
+                                    break;
+                                case 'umbracoMemberApproved':
+                                    saveModel.isApproved = prop.value ? prop.value.toString() === '1' ? true : false : true;
+                                    break;
+                                case 'umbracoMemberComments':
+                                    saveModel.comments = prop.value;
+                                    break;
+                                }
+                            }
+                        });
+                    });
+                    return saveModel;
+                },
+                /** formats the display model used to display the media to the model used to save the media */
+                formatMediaPostData: function (displayModel, action) {
+                    //NOTE: the display model inherits from the save model so we can in theory just post up the display model but 
+                    // we don't want to post all of the data as it is unecessary.
+                    var saveModel = {
+                        id: displayModel.id,
+                        properties: [],
+                        name: displayModel.name,
+                        contentTypeAlias: displayModel.contentTypeAlias,
+                        parentId: displayModel.parentId,
+                        //set the action on the save model
+                        action: action
+                    };
+                    _.each(displayModel.tabs, function (tab) {
+                        _.each(tab.properties, function (prop) {
+                            //don't include the custom generic tab properties
+                            //don't include a property that is marked readonly
+                            if (!prop.alias.startsWith('_umb_') && !prop.readonly) {
+                                saveModel.properties.push({
+                                    id: prop.id,
+                                    alias: prop.alias,
+                                    value: prop.value
+                                });
+                            }
+                        });
+                    });
+                    return saveModel;
+                },
+                /** formats the display model used to display the content to the model used to save the content  */
+                formatContentPostData: function (displayModel, action) {
+                    //this is basically the same as for media but we need to explicitly add some extra properties
+                    var saveModel = this.formatMediaPostData(displayModel, action);
+                    var propExpireDate = displayModel.removeDate;
+                    var propReleaseDate = displayModel.releaseDate;
+                    var propTemplate = displayModel.template;
+                    saveModel.expireDate = propExpireDate ? propExpireDate : null;
+                    saveModel.releaseDate = propReleaseDate ? propReleaseDate : null;
+                    saveModel.templateAlias = propTemplate ? propTemplate : null;
+                    return saveModel;
+                }
+            };
+        }
+        angular.module('umbraco.services').factory('umbDataFormatter', umbDataFormatter);
+    }());
     /**
 * @ngdoc service
 * @name umbraco.services.umbRequestHelper
@@ -7861,7 +8696,7 @@
          * @function
          *
          * @description
-         * This will turn an array of key/value pairs into a query string
+         * This will turn an array of key/value pairs or a standard dictionary into a query string
          * 
          * @param {Array} queryStrings An array of key/value pairs
          */
@@ -8027,10 +8862,12 @@
                 }, function (data, status, headers, config) {
                     //success callback
                     //reset the tabs and set the active one
-                    _.each(data.tabs, function (item) {
-                        item.active = false;
-                    });
-                    data.tabs[activeTabIndex].active = true;
+                    if (data.tabs && data.tabs.length > 0) {
+                        _.each(data.tabs, function (item) {
+                            item.active = false;
+                        });
+                        data.tabs[activeTabIndex].active = true;
+                    }
                     //the data returned is the up-to-date data so the UI will refresh
                     deferred.resolve(data);
                 }, function (data, status, headers, config) {
@@ -8124,11 +8961,108 @@
                         ]);
                     }
                 });
+            },
+            /**
+         * Downloads a file to the client using AJAX/XHR
+         * Based on an implementation here: web.student.tuwien.ac.at/~e0427417/jsdownload.html
+         * See https://stackoverflow.com/a/24129082/694494
+         */
+            downloadFile: function (httpPath) {
+                var deferred = $q.defer();
+                // Use an arraybuffer
+                $http.get(httpPath, { responseType: 'arraybuffer' }).success(function (data, status, headers) {
+                    var octetStreamMime = 'application/octet-stream';
+                    var success = false;
+                    // Get the headers
+                    headers = headers();
+                    // Get the filename from the x-filename header or default to "download.bin"
+                    var filename = headers['x-filename'] || 'download.bin';
+                    // Determine the content type from the header or default to "application/octet-stream"
+                    var contentType = headers['content-type'] || octetStreamMime;
+                    try {
+                        // Try using msSaveBlob if supported
+                        console.log('Trying saveBlob method ...');
+                        var blob = new Blob([data], { type: contentType });
+                        if (navigator.msSaveBlob)
+                            navigator.msSaveBlob(blob, filename);
+                        else {
+                            // Try using other saveBlob implementations, if available
+                            var saveBlob = navigator.webkitSaveBlob || navigator.mozSaveBlob || navigator.saveBlob;
+                            if (saveBlob === undefined)
+                                throw 'Not supported';
+                            saveBlob(blob, filename);
+                        }
+                        console.log('saveBlob succeeded');
+                        success = true;
+                    } catch (ex) {
+                        console.log('saveBlob method failed with the following exception:');
+                        console.log(ex);
+                    }
+                    if (!success) {
+                        // Get the blob url creator
+                        var urlCreator = window.URL || window.webkitURL || window.mozURL || window.msURL;
+                        if (urlCreator) {
+                            // Try to use a download link
+                            var link = document.createElement('a');
+                            if ('download' in link) {
+                                // Try to simulate a click
+                                try {
+                                    // Prepare a blob URL
+                                    console.log('Trying download link method with simulated click ...');
+                                    var blob = new Blob([data], { type: contentType });
+                                    var url = urlCreator.createObjectURL(blob);
+                                    link.setAttribute('href', url);
+                                    // Set the download attribute (Supported in Chrome 14+ / Firefox 20+)
+                                    link.setAttribute('download', filename);
+                                    // Simulate clicking the download link
+                                    var event = document.createEvent('MouseEvents');
+                                    event.initMouseEvent('click', true, true, window, 1, 0, 0, 0, 0, false, false, false, false, 0, null);
+                                    link.dispatchEvent(event);
+                                    console.log('Download link method with simulated click succeeded');
+                                    success = true;
+                                } catch (ex) {
+                                    console.log('Download link method with simulated click failed with the following exception:');
+                                    console.log(ex);
+                                }
+                            }
+                            if (!success) {
+                                // Fallback to window.location method
+                                try {
+                                    // Prepare a blob URL
+                                    // Use application/octet-stream when using window.location to force download
+                                    console.log('Trying download link method with window.location ...');
+                                    var blob = new Blob([data], { type: octetStreamMime });
+                                    var url = urlCreator.createObjectURL(blob);
+                                    window.location = url;
+                                    console.log('Download link method with window.location succeeded');
+                                    success = true;
+                                } catch (ex) {
+                                    console.log('Download link method with window.location failed with the following exception:');
+                                    console.log(ex);
+                                }
+                            }
+                        }
+                    }
+                    if (!success) {
+                        // Fallback to window.open method
+                        console.log('No methods worked for saving the arraybuffer, using last resort window.open');
+                        window.open(httpPath, '_blank', '');
+                    }
+                    deferred.resolve();
+                }).error(function (data, status) {
+                    console.log('Request failed with status: ' + status);
+                    deferred.reject({
+                        errorMsg: 'An error occurred downloading the file',
+                        data: data,
+                        status: status
+                    });
+                });
+                return deferred.promise;
             }
         };
     }
     angular.module('umbraco.services').factory('umbRequestHelper', umbRequestHelper);
-    angular.module('umbraco.services').factory('userService', function ($rootScope, eventsService, $q, $location, $log, securityRetryQueue, authResource, dialogService, $timeout, angularHelper, $http) {
+    angular.module('umbraco.services').factory('userService', function ($rootScope, eventsService, $q, $location, $log, securityRetryQueue, authResource, assetsService, dialogService, $timeout, angularHelper, $http, javascriptLibraryService) {
         var currentUser = null;
         var lastUserId = null;
         var loginDialog = null;
@@ -8310,6 +9244,24 @@
                     return null;
                 });
             },
+            /** Refreshes the current user data with the data stored for the user on the server and returns it */
+            refreshCurrentUser: function () {
+                var deferred = $q.defer();
+                authResource.getCurrentUser().then(function (data) {
+                    var result = {
+                        user: data,
+                        authenticated: true,
+                        lastUserId: lastUserId,
+                        loginType: 'implicit'
+                    };
+                    setCurrentUser(data);
+                    deferred.resolve(currentUser);
+                }, function () {
+                    //it failed, so they are not logged in
+                    deferred.reject();
+                });
+                return deferred.promise;
+            },
             /** Returns the current user object in a promise  */
             getCurrentUser: function (args) {
                 var deferred = $q.defer();
@@ -8321,26 +9273,52 @@
                             lastUserId: lastUserId,
                             loginType: 'implicit'
                         };
-                        //TODO: This is a mega backwards compatibility hack... These variables SHOULD NOT exist in the server variables
-                        // since they are not supposed to be dynamic but I accidentally added them there in 7.1.5 IIRC so some people might
-                        // now be relying on this :(
-                        if (Umbraco && Umbraco.Sys && Umbraco.Sys.ServerVariables) {
-                            Umbraco.Sys.ServerVariables['security'] = {
-                                startContentId: data.startContentId,
-                                startMediaId: data.startMediaId
-                            };
-                        }
                         if (args && args.broadcastEvent) {
                             //broadcast a global event, will inform listening controllers to load in the user specific data
                             eventsService.emit('app.authenticated', result);
                         }
                         setCurrentUser(data);
                         deferred.resolve(currentUser);
+                    }, function () {
+                        //it failed, so they are not logged in
+                        deferred.reject();
                     });
                 } else {
                     deferred.resolve(currentUser);
                 }
                 return deferred.promise;
+            },
+            /** Loads the Moment.js Locale for the current user. */
+            loadMomentLocaleForCurrentUser: function () {
+                function loadLocales(currentUser, supportedLocales) {
+                    var locale = currentUser.locale.toLowerCase();
+                    if (locale !== 'en-us') {
+                        var localeUrls = [];
+                        if (supportedLocales.indexOf(locale + '.js') > -1) {
+                            localeUrls.push('lib/moment/' + locale + '.js');
+                        }
+                        if (locale.indexOf('-') > -1) {
+                            var majorLocale = locale.split('-')[0] + '.js';
+                            if (supportedLocales.indexOf(majorLocale) > -1) {
+                                localeUrls.push('lib/moment/' + majorLocale);
+                            }
+                        }
+                        return assetsService.load(localeUrls, $rootScope);
+                    } else {
+                        //return a noop promise
+                        var deferred = $q.defer();
+                        var promise = deferred.promise;
+                        deferred.resolve(true);
+                        return promise;
+                    }
+                }
+                var promises = {
+                    currentUser: this.getCurrentUser(),
+                    supportedLocales: javascriptLibraryService.getSupportedLocalesForMoment()
+                };
+                return $q.all(promises).then(function (values) {
+                    return loadLocales(values.currentUser, values.supportedLocales);
+                });
             },
             /** Called whenever a server request is made that contains a x-umb-user-seconds response header for which we can update the user's remaining timeout seconds */
             setUserTimeout: function (newTimeout) {
@@ -8348,6 +9326,91 @@
             }
         };
     });
+    (function () {
+        'use strict';
+        function usersHelperService(localizationService) {
+            var userStates = [
+                {
+                    'name': 'All',
+                    'key': 'All'
+                },
+                {
+                    'value': 0,
+                    'name': 'Active',
+                    'key': 'Active',
+                    'color': 'success'
+                },
+                {
+                    'value': 1,
+                    'name': 'Disabled',
+                    'key': 'Disabled',
+                    'color': 'danger'
+                },
+                {
+                    'value': 2,
+                    'name': 'Locked out',
+                    'key': 'LockedOut',
+                    'color': 'danger'
+                },
+                {
+                    'value': 3,
+                    'name': 'Invited',
+                    'key': 'Invited',
+                    'color': 'warning'
+                }
+            ];
+            angular.forEach(userStates, function (userState) {
+                var key = 'user_state' + userState.key;
+                localizationService.localize(key).then(function (value) {
+                    var reg = /^\[[\S\s]*]$/g;
+                    var result = reg.test(value);
+                    if (result === false) {
+                        // Only translate if key exists
+                        userState.name = value;
+                    }
+                });
+            });
+            function getUserStateFromValue(value) {
+                var foundUserState;
+                angular.forEach(userStates, function (userState) {
+                    if (userState.value === value) {
+                        foundUserState = userState;
+                    }
+                });
+                return foundUserState;
+            }
+            function getUserStateByKey(key) {
+                var foundUserState;
+                angular.forEach(userStates, function (userState) {
+                    if (userState.key === key) {
+                        foundUserState = userState;
+                    }
+                });
+                return foundUserState;
+            }
+            function getUserStatesFilter(userStatesObject) {
+                var userStatesFilter = [];
+                for (var key in userStatesObject) {
+                    if (userStatesObject.hasOwnProperty(key)) {
+                        var userState = getUserStateByKey(key);
+                        if (userState) {
+                            userState.count = userStatesObject[key];
+                            userStatesFilter.push(userState);
+                        }
+                    }
+                }
+                return userStatesFilter;
+            }
+            ////////////
+            var service = {
+                getUserStateFromValue: getUserStateFromValue,
+                getUserStateByKey: getUserStateByKey,
+                getUserStatesFilter: getUserStatesFilter
+            };
+            return service;
+        }
+        angular.module('umbraco.services').factory('usersHelper', usersHelperService);
+    }());
     /*Contains multiple services for various helper tasks */
     function versionHelper() {
         return {
@@ -8403,11 +9466,33 @@
             convertToLocalMomentTime: function (strVal, serverOffsetMinutes) {
                 //get the formatted offset time in HH:mm (server time offset is in minutes)
                 var formattedOffset = (serverOffsetMinutes > 0 ? '+' : '-') + moment().startOf('day').minutes(Math.abs(serverOffsetMinutes)).format('HH:mm');
-                //convert to the iso string format
-                var isoFormat = moment(strVal).format('YYYY-MM-DDTHH:mm:ss') + formattedOffset;
+                //if the string format already denotes that it's in "Roundtrip UTC" format (i.e. "2018-02-07T00:20:38.173Z")
+                //otherwise known as https://en.wikipedia.org/wiki/ISO_8601. This is the default format returned from the server
+                //since that is the default formatter for newtonsoft.json. When it is in this format, we need to tell moment
+                //to load the date as UTC so it's not changed, otherwise load it normally
+                var isoFormat;
+                if (strVal.indexOf('T') > -1 && strVal.endsWith('Z')) {
+                    isoFormat = moment.utc(strVal).format('YYYY-MM-DDTHH:mm:ss') + formattedOffset;
+                } else {
+                    isoFormat = moment(strVal).format('YYYY-MM-DDTHH:mm:ss') + formattedOffset;
+                }
                 //create a moment with the iso format which will include the offset with the correct time
                 // then convert it to local time
                 return moment.parseZone(isoFormat).local();
+            },
+            getLocalDate: function (date, culture, format) {
+                if (date) {
+                    var dateVal;
+                    var serverOffset = Umbraco.Sys.ServerVariables.application.serverTimeOffset;
+                    var localOffset = new Date().getTimezoneOffset();
+                    var serverTimeNeedsOffsetting = -serverOffset !== localOffset;
+                    if (serverTimeNeedsOffsetting) {
+                        dateVal = this.convertToLocalMomentTime(date, serverOffset);
+                    } else {
+                        dateVal = moment(date, 'YYYY-MM-DD HH:mm:ss');
+                    }
+                    return dateVal.locale(culture).format(format);
+                }
             }
         };
     }
@@ -8491,9 +9576,9 @@
             This will determine the row/image height for the next collection of images which takes into account the 
             ideal image count per row. It will check if a row can be filled with this ideal count and if not - if there
             are additional images available to fill the row it will keep calculating until they fit.
-
+    
             It will return the calculated height and the number of images for the row.
-
+    
             targetHeight = optional;
         */
             getRowHeightForImages: function (imgs, maxRowHeight, minDisplayHeight, maxRowWidth, idealImgPerRow, margin, targetHeight) {
@@ -8778,15 +9863,15 @@
     function updateChecker($http, umbRequestHelper) {
         return {
             /**
-          * @ngdoc function
-          * @name umbraco.services.updateChecker#check
-          * @methodOf umbraco.services.updateChecker
-          * @function
-          *
-          * @description
-          * Called to load in the legacy tree js which is required on startup if a user is logged in or 
-          * after login, but cannot be called until they are authenticated which is why it needs to be lazy loaded. 
-          */
+         * @ngdoc function
+         * @name umbraco.services.updateChecker#check
+         * @methodOf umbraco.services.updateChecker
+         * @function
+         *
+         * @description
+         * Called to load in the legacy tree js which is required on startup if a user is logged in or 
+         * after login, but cannot be called until they are authenticated which is why it needs to be lazy loaded. 
+         */
             check: function () {
                 return umbRequestHelper.resourcePromise($http.get(umbRequestHelper.getApiUrl('updateCheckApiBaseUrl', 'GetCheck')), 'Failed to retrieve update status');
             }
@@ -8836,173 +9921,29 @@
     angular.module('umbraco.services').factory('umbPropEditorHelper', umbPropEditorHelper);
     /**
 * @ngdoc service
-* @name umbraco.services.umbDataFormatter
-* @description A helper object used to format/transform JSON Umbraco data, mostly used for persisting data to the server
+* @name umbraco.services.queryStrings
+* @description A helper used to get query strings in the real URL (not the hash URL)
 **/
-    function umbDataFormatter() {
+    function queryStrings($window) {
+        var pl = /\+/g;
+        // Regex for replacing addition symbol with a space
+        var search = /([^&=]+)=?([^&]*)/g;
+        var decode = function (s) {
+            return decodeURIComponent(s.replace(pl, ' '));
+        };
         return {
-            formatContentTypePostData: function (displayModel, action) {
-                //create the save model from the display model
-                var saveModel = _.pick(displayModel, 'compositeContentTypes', 'isContainer', 'allowAsRoot', 'allowedTemplates', 'allowedContentTypes', 'alias', 'description', 'thumbnail', 'name', 'id', 'icon', 'trashed', 'key', 'parentId', 'alias', 'path');
-                //TODO: Map these
-                saveModel.allowedTemplates = _.map(displayModel.allowedTemplates, function (t) {
-                    return t.alias;
-                });
-                saveModel.defaultTemplate = displayModel.defaultTemplate ? displayModel.defaultTemplate.alias : null;
-                var realGroups = _.reject(displayModel.groups, function (g) {
-                    //do not include these tabs
-                    return g.tabState === 'init';
-                });
-                saveModel.groups = _.map(realGroups, function (g) {
-                    var saveGroup = _.pick(g, 'inherited', 'id', 'sortOrder', 'name');
-                    var realProperties = _.reject(g.properties, function (p) {
-                        //do not include these properties
-                        return p.propertyState === 'init' || p.inherited === true;
-                    });
-                    var saveProperties = _.map(realProperties, function (p) {
-                        var saveProperty = _.pick(p, 'id', 'alias', 'description', 'validation', 'label', 'sortOrder', 'dataTypeId', 'groupId', 'memberCanEdit', 'showOnMemberProfile');
-                        return saveProperty;
-                    });
-                    saveGroup.properties = saveProperties;
-                    //if this is an inherited group and there are not non-inherited properties on it, then don't send up the data
-                    if (saveGroup.inherited === true && saveProperties.length === 0) {
-                        return null;
-                    }
-                    return saveGroup;
-                });
-                //we don't want any null groups
-                saveModel.groups = _.reject(saveModel.groups, function (g) {
-                    return !g;
-                });
-                return saveModel;
-            },
-            /** formats the display model used to display the data type to the model used to save the data type */
-            formatDataTypePostData: function (displayModel, preValues, action) {
-                var saveModel = {
-                    parentId: displayModel.parentId,
-                    id: displayModel.id,
-                    name: displayModel.name,
-                    selectedEditor: displayModel.selectedEditor,
-                    //set the action on the save model
-                    action: action,
-                    preValues: []
-                };
-                for (var i = 0; i < preValues.length; i++) {
-                    saveModel.preValues.push({
-                        key: preValues[i].alias,
-                        value: preValues[i].value
-                    });
+            getParams: function () {
+                var match;
+                var query = $window.location.search.substring(1);
+                var urlParams = {};
+                while (match = search.exec(query)) {
+                    urlParams[decode(match[1])] = decode(match[2]);
                 }
-                return saveModel;
-            },
-            /** formats the display model used to display the member to the model used to save the member */
-            formatMemberPostData: function (displayModel, action) {
-                //this is basically the same as for media but we need to explicitly add the username,email, password to the save model
-                var saveModel = this.formatMediaPostData(displayModel, action);
-                saveModel.key = displayModel.key;
-                var genericTab = _.find(displayModel.tabs, function (item) {
-                    return item.id === 0;
-                });
-                //map the member login, email, password and groups
-                var propLogin = _.find(genericTab.properties, function (item) {
-                    return item.alias === '_umb_login';
-                });
-                var propEmail = _.find(genericTab.properties, function (item) {
-                    return item.alias === '_umb_email';
-                });
-                var propPass = _.find(genericTab.properties, function (item) {
-                    return item.alias === '_umb_password';
-                });
-                var propGroups = _.find(genericTab.properties, function (item) {
-                    return item.alias === '_umb_membergroup';
-                });
-                saveModel.email = propEmail.value;
-                saveModel.username = propLogin.value;
-                saveModel.password = propPass.value;
-                var selectedGroups = [];
-                for (var n in propGroups.value) {
-                    if (propGroups.value[n] === true) {
-                        selectedGroups.push(n);
-                    }
-                }
-                saveModel.memberGroups = selectedGroups;
-                //turn the dictionary into an array of pairs
-                var memberProviderPropAliases = _.pairs(displayModel.fieldConfig);
-                _.each(displayModel.tabs, function (tab) {
-                    _.each(tab.properties, function (prop) {
-                        var foundAlias = _.find(memberProviderPropAliases, function (item) {
-                            return prop.alias === item[1];
-                        });
-                        if (foundAlias) {
-                            //we know the current property matches an alias, now we need to determine which membership provider property it was for
-                            // by looking at the key
-                            switch (foundAlias[0]) {
-                            case 'umbracoMemberLockedOut':
-                                saveModel.isLockedOut = prop.value.toString() === '1' ? true : false;
-                                break;
-                            case 'umbracoMemberApproved':
-                                saveModel.isApproved = prop.value.toString() === '1' ? true : false;
-                                break;
-                            case 'umbracoMemberComments':
-                                saveModel.comments = prop.value;
-                                break;
-                            }
-                        }
-                    });
-                });
-                return saveModel;
-            },
-            /** formats the display model used to display the media to the model used to save the media */
-            formatMediaPostData: function (displayModel, action) {
-                //NOTE: the display model inherits from the save model so we can in theory just post up the display model but 
-                // we don't want to post all of the data as it is unecessary.
-                var saveModel = {
-                    id: displayModel.id,
-                    properties: [],
-                    name: displayModel.name,
-                    contentTypeAlias: displayModel.contentTypeAlias,
-                    parentId: displayModel.parentId,
-                    //set the action on the save model
-                    action: action
-                };
-                _.each(displayModel.tabs, function (tab) {
-                    _.each(tab.properties, function (prop) {
-                        //don't include the custom generic tab properties
-                        if (!prop.alias.startsWith('_umb_')) {
-                            saveModel.properties.push({
-                                id: prop.id,
-                                alias: prop.alias,
-                                value: prop.value
-                            });
-                        }
-                    });
-                });
-                return saveModel;
-            },
-            /** formats the display model used to display the content to the model used to save the content  */
-            formatContentPostData: function (displayModel, action) {
-                //this is basically the same as for media but we need to explicitly add some extra properties
-                var saveModel = this.formatMediaPostData(displayModel, action);
-                var genericTab = _.find(displayModel.tabs, function (item) {
-                    return item.id === 0;
-                });
-                var propExpireDate = _.find(genericTab.properties, function (item) {
-                    return item.alias === '_umb_expiredate';
-                });
-                var propReleaseDate = _.find(genericTab.properties, function (item) {
-                    return item.alias === '_umb_releasedate';
-                });
-                var propTemplate = _.find(genericTab.properties, function (item) {
-                    return item.alias === '_umb_template';
-                });
-                saveModel.expireDate = propExpireDate.value;
-                saveModel.releaseDate = propReleaseDate.value;
-                saveModel.templateAlias = propTemplate.value;
-                return saveModel;
+                return urlParams;
             }
         };
     }
-    angular.module('umbraco.services').factory('umbDataFormatter', umbDataFormatter);
+    angular.module('umbraco.services').factory('queryStrings', queryStrings);
     /**
  * @ngdoc service
  * @name umbraco.services.windowResizeListener

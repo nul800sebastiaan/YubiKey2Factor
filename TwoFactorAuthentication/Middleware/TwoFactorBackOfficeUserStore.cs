@@ -12,8 +12,9 @@ namespace TwoFactorAuthentication.Middleware
     /// </summary>
     internal class TwoFactorBackOfficeUserStore : BackOfficeUserStore
     {
-        public TwoFactorBackOfficeUserStore(IUserService userService, IExternalLoginService externalLoginService, MembershipProviderBase usersMembershipProvider)
-            : base(userService, externalLoginService, usersMembershipProvider)
+        public TwoFactorBackOfficeUserStore(IUserService userService, IExternalLoginService externalLoginService, 
+            IEntityService entityService, MembershipProviderBase usersMembershipProvider)
+            : base(userService, entityService, externalLoginService, usersMembershipProvider)
         { }
 
         /// <summary>
