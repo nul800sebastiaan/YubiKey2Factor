@@ -1,5 +1,5 @@
 # YubiKey2Factor
-2FA with Google Authenticator and YubiKey (thank Sebastian)
+2FA with Google Authenticator and YubiKey (thanks Sebastian)
 This version contains google authenticator mechanisem only, and not the yubikey.
 
 Configuration-
