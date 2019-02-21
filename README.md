@@ -1,5 +1,5 @@
 # YubiKey2Factor
-2FA with Google Authenticator and YubiKey
+2FA with Google Authenticator and YubiKey (thank Sebastian)
 This version contains google authenticator mechanisem only, and not the yubikey.
 
 Configuration-
@@ -7,3 +7,4 @@ Configuration-
 2. Make sure to install with nuget google authenticator dll.
 3. After the umbraco is loading, make sure that the table TwoFactor was create on your database. 
 This table will stored your users and manage whether it need 2fa or not.
+4. All the relevant code is in the folder of App_plugins/2FactorAuthentication and on the root folder: 2FactorAuthentication.
