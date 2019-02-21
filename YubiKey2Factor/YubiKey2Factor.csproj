@@ -76,6 +76,10 @@
     <Reference Include="Examine, Version=0.1.89.0, Culture=neutral, processorArchitecture=MSIL">
       <HintPath>..\packages\Examine.0.1.89\lib\net45\Examine.dll</HintPath>
     </Reference>
+    <Reference Include="Google.Authenticator, Version=1.2.1.0, Culture=neutral, processorArchitecture=MSIL">
+      <HintPath>..\packages\GoogleAuthenticator.1.2.1\lib\net45\Google.Authenticator.dll</HintPath>
+      <Private>True</Private>
+    </Reference>
     <Reference Include="HtmlAgilityPack, Version=1.4.9.5, Culture=neutral, PublicKeyToken=bd319b19eaf3b43a, processorArchitecture=MSIL">
       <HintPath>..\packages\HtmlAgilityPack.1.4.9.5\lib\Net45\HtmlAgilityPack.dll</HintPath>
     </Reference>
@@ -291,9 +295,12 @@
     </Reference>
   </ItemGroup>
   <ItemGroup>
+    <Content Include="App_Plugins\2FactorAuthentication\2fa-login.html" />
+    <Content Include="App_Plugins\2FactorAuthentication\2fa-login.js" />
     <Content Include="App_Plugins\2FactorAuthentication\managementdashboard.controller.js" />
     <Content Include="App_Plugins\2FactorAuthentication\managementdashboard.html" />
     <Content Include="App_Plugins\2FactorAuthentication\managementdashboard.service.js" />
+    <Content Include="App_Plugins\2FactorAuthentication\read me.txt" />
     <Content Include="App_Plugins\ModelsBuilder\modelsbuilder.controller.js" />
     <Content Include="App_Plugins\ModelsBuilder\modelsbuilder.htm" />
     <Content Include="App_Plugins\ModelsBuilder\modelsbuilder.resource.js" />
@@ -326,7 +333,6 @@
     <Content Include="Config\ClientDependency.config">
       <SubType>Designer</SubType>
     </Content>
-    <Content Include="App_Plugins\2FactorAuthentication\package.manifest" />
     <Content Include="Config\Dashboard.config" />
     <Content Include="Views\Master.cshtml" />
     <Content Include="Config\log4net.config" />
@@ -353,6 +359,7 @@
     <Content Include="Config\BackOfficeTours\getting-started.json" />
     <Content Include="Config\applications.config" />
     <Content Include="Config\404handlers.config" />
+    <Content Include="App_Plugins\2FactorAuthentication\package.manifest" />
     <None Include="Web.Debug.config">
       <DependentUpon>Web.config</DependentUpon>
     </None>
@@ -361,14 +368,24 @@
     </None>
   </ItemGroup>
   <ItemGroup>
-    <Content Include="App_Plugins\2FactorAuthentication\2fa-login.html" />
-    <Content Include="App_Plugins\2FactorAuthentication\2fa-login.js" />
     <Content Include="Config\grid.editors.config.js" />
     <Content Include="Web.config">
       <SubType>Designer</SubType>
     </Content>
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="2FactorAuthentication\Constants.cs" />
+    <Compile Include="2FactorAuthentication\Controllers\TwoFactorAuthController.cs" />
+    <Compile Include="2FactorAuthentication\Middleware\TwoFactorBackOfficeUserManager.cs" />
+    <Compile Include="2FactorAuthentication\Middleware\TwoFactorBackOfficeUserStore.cs" />
+    <Compile Include="2FactorAuthentication\Middleware\TwoFactorEventHandler.cs" />
+    <Compile Include="2FactorAuthentication\Middleware\TwoFactorValidationProvider.cs" />
+    <Compile Include="2FactorAuthentication\Migration\AddDashboardConfig.cs" />
+    <Compile Include="2FactorAuthentication\Migration\CreateTwoFactorTable.cs" />
+    <Compile Include="2FactorAuthentication\Migration\MigrationEvents.cs" />
+    <Compile Include="2FactorAuthentication\Migration\TwoFactorAuthenticationSection.cs" />
+    <Compile Include="2FactorAuthentication\Models\TwoFactor.cs" />
+    <Compile Include="2FactorAuthentication\Models\TwoFactorAuthInfo.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
   </ItemGroup>
   <ItemGroup>
@@ -378,12 +395,6 @@
   <ItemGroup>
     <Folder Include="Config\imageprocessor\" />
     <Folder Include="Views\TwoFactorAuth\" />
-  </ItemGroup>
-  <ItemGroup>
-    <ProjectReference Include="..\TwoFactorAuthentication\TwoFactorAuthentication.csproj">
-      <Project>{648c57c0-d1da-4f72-a4f8-3d832dac2805}</Project>
-      <Name>TwoFactorAuthentication</Name>
-    </ProjectReference>
   </ItemGroup>
   <PropertyGroup>
     <VisualStudioVersion Condition="'$(VisualStudioVersion)' == ''">10.0</VisualStudioVersion>
