@@ -1,5 +1,5 @@
 # Umbraco 2fa plugin with Google authenticator
-2FA with Google Authenticator and YubiKey (thank Sebastian)
+2FA with Google Authenticator and YubiKey (thank's Sebastian)
 This version contains google authenticator mechanisem only, and not the yubikey.
 
 Configuration-
