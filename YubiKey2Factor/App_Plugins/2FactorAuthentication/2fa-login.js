@@ -1,23 +1,26 @@
 ﻿angular.module("umbraco").controller("2FactorAuthentication.LoginController",
-    function ($scope, $cookies, localizationService, userService, externalLoginInfo, resetPasswordCodeInfo, $timeout, authResource, dialogService) {
+    function ($scope, $cookies, localizationService, userService, externalLoginInfo, resetPasswordCodeInfo, $timeout, authResource, dialogService, twoFactorService) {
 
         $scope.code = "";
         $scope.provider = "";
         $scope.providers = [];
         $scope.step = "send";
-
-        authResource.get2FAProviders()
+        
+       /* not working twoFactorService.get2FAProviders()
             .then(function (data) {
                 console.log(data);
                 $scope.providers = data;
-            });
+            });*/
+        $scope.providers = "GoogleAuthenticator";//temp netser
+        $scope.step = "code";
 
-        $scope.send = function (provider) {
-            $scope.provider = provider;
-            $scope.step = "code";
-        };
+        //$scope.send = function (provider) {
+        //    $scope.provider = provider;
+        //    $scope.step = "code";
+        //};
 
         $scope.validate = function (provider, code) {
+            provider = "GoogleAuthenticator"; //temp netser
             $scope.error2FA = "";
             $scope.code = code;
             authResource.verify2FACode(provider, code)

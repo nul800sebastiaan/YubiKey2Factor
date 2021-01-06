@@ -5,8 +5,6 @@ VisualStudioVersion = 14.0.25420.1
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "YubiKey2Factor", "YubiKey2Factor\YubiKey2Factor.csproj", "{A0FD689F-11FB-40A0-AE0C-BC78D0234FD7}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "TwoFactorAuthentication", "TwoFactorAuthentication\TwoFactorAuthentication.csproj", "{648C57C0-D1DA-4F72-A4F8-3D832DAC2805}"
-EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -17,10 +15,6 @@ Global
 		{A0FD689F-11FB-40A0-AE0C-BC78D0234FD7}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{A0FD689F-11FB-40A0-AE0C-BC78D0234FD7}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{A0FD689F-11FB-40A0-AE0C-BC78D0234FD7}.Release|Any CPU.Build.0 = Release|Any CPU
-		{648C57C0-D1DA-4F72-A4F8-3D832DAC2805}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
-		{648C57C0-D1DA-4F72-A4F8-3D832DAC2805}.Debug|Any CPU.Build.0 = Debug|Any CPU
-		{648C57C0-D1DA-4F72-A4F8-3D832DAC2805}.Release|Any CPU.ActiveCfg = Release|Any CPU
-		{648C57C0-D1DA-4F72-A4F8-3D832DAC2805}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

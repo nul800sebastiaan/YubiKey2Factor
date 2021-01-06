@@ -10,7 +10,7 @@ namespace TwoFactorAuthentication.Middleware
     /// <summary>
     /// Subclass the default BackOfficeUserManager and extend it to support 2FA
     /// </summary>
-    internal class TwoFactorBackOfficeUserStore : BackOfficeUserStore
+    public class TwoFactorBackOfficeUserStore : BackOfficeUserStore
     {
         public TwoFactorBackOfficeUserStore(IUserService userService, IExternalLoginService externalLoginService, 
             IEntityService entityService, MembershipProviderBase usersMembershipProvider)

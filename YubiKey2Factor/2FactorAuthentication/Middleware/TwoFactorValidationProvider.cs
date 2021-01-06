@@ -7,11 +7,11 @@ using Microsoft.Owin.Security.DataProtection;
 using TwoFactorAuthentication.Models;
 using Umbraco.Core;
 using Umbraco.Core.Models.Identity;
-using YubicoDotNetClient;
+
 
 namespace TwoFactorAuthentication.Middleware
 {
-    internal class TwoFactorValidationProvider : DataProtectorTokenProvider<BackOfficeIdentityUser, int>, IUserTokenProvider<BackOfficeIdentityUser, int>
+    public class TwoFactorValidationProvider : DataProtectorTokenProvider<BackOfficeIdentityUser, int>, IUserTokenProvider<BackOfficeIdentityUser, int>
     {
         public TwoFactorValidationProvider(IDataProtector protector) : base(protector)
         { }
@@ -41,12 +41,12 @@ namespace TwoFactorAuthentication.Middleware
                 return Task.FromResult(validToken);
             }
 
-            if (purpose == Constants.YubiKeyProviderName)
+           /* if (purpose == Constants.YubiKeyProviderName)
             {
                 var yubiKeyService = new YubiKeyService();
                 var response = yubiKeyService.Validate(token, user.Id);
                 return Task.FromResult(response != null && response.Status == YubicoResponseStatus.Ok);
-            }
+            }*/
 
             return Task.FromResult(false);
         }

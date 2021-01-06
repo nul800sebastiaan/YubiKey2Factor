@@ -6,14 +6,17 @@
         getGoogleAuthenticatorSetupCode: function () {
             return $http.get("/umbraco/backoffice/api/TwoFactorAuth/GoogleAuthenticatorSetupCode/");
         },
-        validateAndSave: function (code) {
-            return $http.post("/umbraco/backoffice/api/TwoFactorAuth/ValidateAndSave/?code=" + code);
-        },
+        /* netser validateAndSave: function (code) {
+            return $http.post("/umbraco/backoffice/api/TwoFactorAuth1/ValidateAndSave/?code=" + code);
+        },*/
         validateAndSaveGoogleAuth: function (code) {
             return $http.post("/umbraco/backoffice/api/TwoFactorAuth/ValidateAndSaveGoogleAuth/?code=" + code);
         },
         disable: function () {
             return $http.post("/umbraco/backoffice/api/TwoFactorAuth/Disable/");
-        }
+        },
+        get2FAProviders: function () {
+            return $http.post("/umbraco/backoffice/api/TwoFactorAuth/Get2FAProviders/");
+    }
     };
 });

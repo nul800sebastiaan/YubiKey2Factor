@@ -14,7 +14,7 @@ namespace TwoFactorAuthentication.Middleware
     /// <summary>
     /// Subclass the default BackOfficeUserManager and extend it to support 2FA
     /// </summary>
-    internal class TwoFactorBackOfficeUserManager : BackOfficeUserManager, IUmbracoBackOfficeTwoFactorOptions
+    public class TwoFactorBackOfficeUserManager : BackOfficeUserManager, IUmbracoBackOfficeTwoFactorOptions
     {
         public TwoFactorBackOfficeUserManager(IUserStore<BackOfficeIdentityUser, int> store) : base(store)
         { }
@@ -45,9 +45,7 @@ namespace TwoFactorAuthentication.Middleware
             
             //Here you can specify the 2FA providers that you want to implement
             var dataProtectionProvider = options.DataProtectionProvider;
-            manager.RegisterTwoFactorProvider(Constants.YubiKeyProviderName, 
-                new TwoFactorValidationProvider(dataProtectionProvider.Create(Constants.YubiKeyProviderName)));
-            manager.RegisterTwoFactorProvider(Constants.GoogleAuthenticatorProviderName, 
+                manager.RegisterTwoFactorProvider(Constants.GoogleAuthenticatorProviderName, 
                 new TwoFactorValidationProvider(dataProtectionProvider.Create(Constants.GoogleAuthenticatorProviderName)));
 
             return manager;
